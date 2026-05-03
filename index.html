@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="theme-color" content="#4CAF50" />
+<title>体重 & 食事管理</title>
+<link rel="manifest" href="manifest.json" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root{
+    --target: 59.0;
+    --limit: 60.0;
+    --green:#4CAF50;
+    --green-dark:#2E7D32;
+    --amber:#FB8C00;
+    --red:#E53935;
+    --blue:#1976D2;
+    --teal:#00ACC1;
+    --bg:#F7F9F7;
+    --card:#FFFFFF;
+    --text:#263238;
+    --muted:#78909C;
+    --border:#ECEFF1;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",sans-serif;}
+  body{padding:max(12px,env(safe-area-inset-top)) 12px max(12px,env(safe-area-inset-bottom));max-width:480px;margin:0 auto;}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  h1{font-size:18px;margin:0;color:var(--green-dark);font-weight:700;letter-spacing:.02em}
+  .sub{font-size:11px;color:var(--muted)}
+  .card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 0 0 1px var(--border)}
+  .card h2{font-size:14px;margin:0 0 10px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px}
+  .big{font-size:32px;font-weight:700;letter-spacing:-.02em;line-height:1}
+  .unit{font-size:13px;color:var(--muted);margin-left:4px}
+  .status{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;margin-top:6px}
+  .status.ok{background:#E8F5E9;color:var(--green-dark)}
+  .status.warn{background:#FFF3E0;color:var(--amber)}
+  .status.over{background:#FFEBEE;color:var(--red)}
+  .row{display:flex;gap:8px;align-items:center;}
+  input[type="number"],input[type="time"],input[type="date"],input[type="text"]{font-size:16px;padding:10px 12px;border:1.5px solid var(--border);border-radius:12px;width:100%;font-weight:500;color:var(--text);outline:none;background:#FAFBFA;font-family:inherit}
+  input[type="number"]:focus,input[type="time"]:focus,input[type="date"]:focus,input[type="text"]:focus{border-color:var(--green)}
+  .weight-input{font-size:26px !important;font-weight:600 !important}
+  button.primary{background:var(--green);color:#fff;border:none;padding:12px 16px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;min-width:96px;box-shadow:0 2px 0 var(--green-dark);}
+  button.primary:active{transform:translateY(1px);box-shadow:0 1px 0 var(--green-dark);}
+  button.surf{background:var(--teal);color:#fff;border:none;padding:12px 16px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 2px 0 #00838F;width:100%}
+  button.surf:active{transform:translateY(1px);box-shadow:0 1px 0 #00838F}
+  .seg{display:flex;background:#ECEFF1;border-radius:10px;padding:3px;margin:8px 0 12px;}
+  .seg button{flex:1;border:none;background:transparent;padding:8px 0;border-radius:8px;font-weight:600;color:var(--muted);font-size:13px;cursor:pointer;}
+  .seg button.active{background:#fff;color:var(--green-dark);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  canvas{width:100% !important;max-height:260px;}
+  .meal-row{display:flex;gap:10px;align-items:center;padding:10px;border:1px dashed var(--border);border-radius:12px;margin-top:8px;}
+  .meal-row img{width:56px;height:56px;border-radius:10px;object-fit:cover;background:#eee}
+  .meal-icon{width:56px;height:56px;border-radius:10px;background:#FFF8E1;display:flex;align-items:center;justify-content:center;font-size:28px}
+  .meal-meta{font-size:12px;color:var(--muted)}
+  .meal-meta b{color:var(--text);font-size:13px}
+  .hint{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5}
+  .upload{display:flex;flex-direction:column;gap:6px;}
+  .upload label{display:block;background:#FFF8E1;color:#6D4C41;padding:12px;border-radius:12px;text-align:center;font-weight:600;cursor:pointer;border:1.5px dashed #FFCA28;font-size:14px;}
+  .upload input[type=file]{display:none}
+  .quick-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
+  .quick-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;border:1.5px solid var(--border);background:#FAFBFA;border-radius:12px;cursor:pointer;gap:4px;font-family:inherit;transition:all .1s}
+  .quick-btn:active{transform:scale(.96);background:#F1F8E9;border-color:var(--green)}
+  .quick-btn .ico{font-size:24px;line-height:1}
+  .quick-btn .ttl{font-size:13px;font-weight:700;color:var(--text)}
+  .quick-btn .kcal{font-size:11px;color:var(--muted)}
+  .ai-advice{background:linear-gradient(135deg,#E8F5E9 0%, #F1F8E9 100%);border-radius:12px;padding:12px;margin-top:8px;font-size:13px;line-height:1.7;color:var(--green-dark);white-space:pre-wrap}
+  .character-slot{display:flex;gap:10px;align-items:flex-start;margin-top:8px}
+  .character-slot .avatar{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#A5D6A7,#FFCC80);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,.1)}
+  .character-slot .bubble{flex:1}
+  .settings-btn{background:transparent;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:6px 10px;border-radius:8px}
+  .settings-btn:active{background:#ECEFF1}
+  dialog{border:none;border-radius:16px;padding:16px;max-width:360px;width:90%;box-shadow:0 10px 30px rgba(0,0,0,.2);}
+  dialog::backdrop{background:rgba(0,0,0,.4)}
+  dialog h3{margin:0 0 8px 0;font-size:15px;color:var(--green-dark)}
+  dialog label{display:block;font-size:12px;color:var(--muted);margin-top:10px;}
+  dialog input,dialog select{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;font-family:inherit}
+  dialog .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;}
+  dialog button{padding:8px 14px;border-radius:8px;border:none;font-weight:600;cursor:pointer;font-size:13px;}
+  dialog button.ok{background:var(--green);color:#fff}
+  dialog button.surf-ok{background:var(--teal);color:#fff}
+  dialog button.cancel{background:#ECEFF1;color:var(--text)}
+  footer{text-align:center;font-size:10px;color:var(--muted);margin-top:12px;line-height:1.6}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#F1F8E9;color:var(--green-dark);font-size:10px;font-weight:700;margin-left:6px;}
+  .target-line{font-size:12px;color:var(--muted);margin-top:4px}
+  .summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .summary-cell{background:#FAFBFA;border-radius:10px;padding:8px 10px}
+  .summary-cell .lbl{font-size:10px;color:var(--muted);font-weight:600}
+  .summary-cell .val{font-size:18px;font-weight:700;margin-top:2px}
+  .summary-cell.intake .val{color:var(--amber)}
+  .summary-cell.burn .val{color:var(--teal)}
+  .summary-cell.net .val{color:var(--green-dark)}
+  .summary-cell.net .val.pos{color:var(--red)}
+  .surf-row{display:flex;gap:10px;align-items:center;padding:10px;background:#E0F7FA;border-radius:12px;margin-top:8px}
+  .surf-row .ico{font-size:24px}
+  .surf-row .info{flex:1;font-size:12px;color:var(--text)}
+  .surf-row .info b{font-size:13px}
+  .strength-pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700}
+  .strength-pill.s1{background:#E8F5E9;color:var(--green-dark)}
+  .strength-pill.s2{background:#FFF3E0;color:var(--amber)}
+  .strength-pill.s3{background:#FFEBEE;color:var(--red)}
+  .drive-status{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;font-size:10px;font-weight:700;cursor:pointer;border:none}
+  .drive-status.off{background:#ECEFF1;color:var(--muted)}
+  .drive-status.connecting{background:#FFF3E0;color:var(--amber)}
+  .drive-status.on{background:#E8F5E9;color:var(--green-dark)}
+  .drive-status.err{background:#FFEBEE;color:var(--red)}
+  .toast{position:fixed;bottom:max(20px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:rgba(38,50,56,.95);color:#fff;padding:10px 16px;border-radius:24px;font-size:13px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.2);max-width:90%;text-align:center;animation:toastIn .25s}
+  @keyframes toastIn{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+  .toast.err{background:rgba(229,57,53,.95)}
+  .toast.ok{background:rgba(46,125,50,.95)}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>体重 &amp; 食事管理 <span class="pill">プロトタイプ</span></h1>
+    <div class="sub">目標 &lt; 60.0 kg / 基準 59.0 kg</div>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+    <div id="driveStatus" class="drive-status off">☁ 未接続</div>
+    <button class="settings-btn" id="btnSettings">⚙ 設定</button>
+  </div>
+</header>
+
+<!-- 今日の体重 + サマリー -->
+<section class="card" aria-label="今日の体重">
+  <div style="display:flex;align-items:baseline;justify-content:space-between;">
+    <div>
+      <div class="sub">今日の体重</div>
+      <div class="big" id="todayWeight">—<span class="unit">kg</span></div>
+      <div id="statusBadge" class="status ok">未入力</div>
+      <div class="target-line">基準 <span id="targetLabel">59.0</span> kg（差: <span id="diffTarget">—</span>）</div>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:14px">
+    <input type="number" class="weight-input" id="weightInput" step="0.1" min="30" max="150" placeholder="例: 59.4" inputmode="decimal"/>
+    <button class="primary" id="btnSave">記録</button>
+  </div>
+
+  <div class="summary-grid">
+    <div class="summary-cell intake">
+      <div class="lbl">🍽 摂取 (今日)</div>
+      <div class="val" id="todayCal">0<span class="unit">kcal</span></div>
+    </div>
+    <div class="summary-cell burn">
+      <div class="lbl">🏄 消費 (サーフィン)</div>
+      <div class="val" id="todayBurn">0<span class="unit">kcal</span></div>
+    </div>
+    <div class="summary-cell net" style="grid-column:span 2">
+      <div class="lbl">⚖ 純カロリー (摂取 - 消費)</div>
+      <div class="val" id="todayNet">0<span class="unit">kcal</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- グラフ -->
+<section class="card" aria-label="体重推移">
+  <div class="row" style="justify-content:space-between">
+    <h2>📈 体重推移</h2>
+    <div class="sub" id="chartLegend">—</div>
+  </div>
+  <div class="seg" role="tablist">
+    <button data-range="7" class="active">1週間</button>
+    <button data-range="30">1ヶ月</button>
+    <button data-range="365">1年</button>
+  </div>
+  <canvas id="chart" height="220"></canvas>
+</section>
+
+<!-- 食事記録 -->
+<section class="card" aria-label="食事記録">
+  <h2>🍽 今日の食事</h2>
+
+  <!-- 写真アップロード -->
+  <div class="upload">
+    <label for="mealPhoto">📷 食事の画像を追加（AI解析）</label>
+    <input type="file" id="mealPhoto" accept="image/*" capture="environment" />
+  </div>
+
+  <!-- クイック記録ボタン -->
+  <div style="margin-top:12px;font-size:12px;color:var(--muted);font-weight:600">写真がない時はワンタップで記録</div>
+  <div class="quick-grid">
+    <button class="quick-btn" data-quick="少量" data-kcal="300">
+      <div class="ico">🥗</div><div class="ttl">少量</div><div class="kcal">約 300 kcal</div>
+    </button>
+    <button class="quick-btn" data-quick="普通" data-kcal="600">
+      <div class="ico">🍱</div><div class="ttl">普通</div><div class="kcal">約 600 kcal</div>
+    </button>
+    <button class="quick-btn" data-quick="ドカ食い" data-kcal="1000">
+      <div class="ico">🍔</div><div class="ttl">ドカ食い</div><div class="kcal">約 1,000 kcal</div>
+    </button>
+    <button class="quick-btn" data-quick="プロテイン12g" data-kcal="60">
+      <div class="ico">💪</div><div class="ttl">プロテイン</div><div class="kcal">タンパク質 12g / 60 kcal</div>
+    </button>
+  </div>
+
+  <div id="mealList"></div>
+  <div class="hint">画像は Drive「食事画像」へ、解析結果は「健康管理/食事の記録.xlsx」へ保存。クイック記録も同じExcelに記録されます。</div>
+</section>
+
+<!-- サーフィン記録 -->
+<section class="card" aria-label="サーフィン記録">
+  <h2>🏄 サーフィン記録</h2>
+  <button class="surf" id="btnAddSurf">＋ 今日のサーフィンを記録</button>
+  <div id="surfList"></div>
+  <div class="hint">サーフィン後の食事タイミング・量のアドバイスに使われます。</div>
+</section>
+
+<!-- AIアドバイス（将来キャラクター化を想定） -->
+<section class="card" aria-label="AI健康アドバイス">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <h2 style="margin:0">🤖 AI 健康アドバイス</h2>
+    <button class="settings-btn" id="btnAdvice">生成</button>
+  </div>
+  <div class="character-slot">
+    <div class="avatar" id="characterAvatar" title="将来 NANOBANANA で生成したオリジナルキャラクターと差替え予定">🧑‍⚕️</div>
+    <div class="bubble">
+      <div class="ai-advice" id="aiAdvice">体重・食事・サーフィンの記録が集まると、Claudeが分析して具体的なアドバイスを表示します。</div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  本アプリは端末内に一時保存します。APIキー・個人情報は外部送信されません。<br/>
+  設定した Google Drive フォルダ（食事画像／健康管理）以外にはアクセスしません。
+</footer>
+
+<!-- 設定ダイアログ -->
+<dialog id="dlgSettings">
+  <h3>⚙ 設定（この端末にのみ保存）</h3>
+  <label>Claude API Key
+    <input type="password" id="cfgClaude" placeholder="sk-ant-..." autocomplete="off"/>
+  </label>
+  <label>Google OAuth Client ID
+    <input type="text" id="cfgGoogleId" placeholder="xxx.apps.googleusercontent.com" autocomplete="off"/>
+  </label>
+  <label>Drive フォルダID「食事画像」
+    <input type="text" id="cfgFolderMeals" placeholder="folder_id_meals" autocomplete="off"/>
+  </label>
+  <label>Drive フォルダID「健康管理」
+    <input type="text" id="cfgFolderHealth" placeholder="folder_id_health" autocomplete="off"/>
+  </label>
+  <label>基準体重 (kg)
+    <input type="number" id="cfgTarget" step="0.1" value="59.0"/>
+  </label>
+  <label>上限体重 (kg)
+    <input type="number" id="cfgLimit" step="0.1" value="60.0"/>
+  </label>
+  <div class="actions">
+    <button class="cancel" id="cfgCancel">キャンセル</button>
+    <button class="ok" id="cfgSave">保存</button>
+  </div>
+  <div class="hint" style="margin-top:8px">キーはこの端末のブラウザ内にのみ保存され、外部には送信されません（Claude API への問い合わせ時のみ、画像と共に送信されます）。</div>
+</dialog>
+
+<!-- クイック食事ダイアログ -->
+<dialog id="dlgQuickMeal">
+  <h3>🍽 クイック食事記録</h3>
+  <div id="quickMealHeader" style="font-size:14px;font-weight:700;color:var(--green-dark)"></div>
+  <label>日付<input type="date" id="qmDate"/></label>
+  <label>時刻<input type="time" id="qmTime"/></label>
+  <label>カロリー (kcal) <span class="sub">※ 目安。修正可能</span>
+    <input type="number" id="qmKcal" min="0" step="10"/>
+  </label>
+  <label>メモ (任意)<input type="text" id="qmMemo" placeholder="例: 移動中に補食"/></label>
+  <div class="actions">
+    <button class="cancel" id="qmCancel">キャンセル</button>
+    <button class="ok" id="qmSave">記録する</button>
+  </div>
+</dialog>
+
+<!-- サーフィン記録ダイアログ -->
+<dialog id="dlgSurf">
+  <h3>🏄 サーフィン記録</h3>
+  <label>日付<input type="date" id="sfDate"/></label>
+  <label>開始時刻<input type="time" id="sfStart"/></label>
+  <label>時間 (分) <input type="number" id="sfMin" min="10" max="600" step="5" value="90"/></label>
+  <label>強度
+    <select id="sfStrength">
+      <option value="easy">軽め (波待ち多め) 約 200 kcal/h</option>
+      <option value="normal" selected>普通 (パドル中心) 約 350 kcal/h</option>
+      <option value="hard">ハード (連続ライディング) 約 500 kcal/h</option>
+    </select>
+  </label>
+  <label>場所 (任意)<input type="text" id="sfPlace" placeholder="例: 鵠沼"/></label>
+  <label>メモ (任意)<input type="text" id="sfMemo" placeholder="例: 胸サイズ"/></label>
+  <div id="sfBurnPreview" style="margin-top:10px;padding:8px;background:#E0F7FA;border-radius:8px;font-size:13px;color:#006064;font-weight:600;text-align:center"></div>
+  <div class="actions">
+    <button class="cancel" id="sfCancel">キャンセル</button>
+    <button class="surf-ok" id="sfSave">記録する</button>
+  </div>
+</dialog>
+
+<script>
+/* ============================================================
+   体重 & 食事 & サーフィン管理プロトタイプ
+   - データはブラウザ localStorage に保存（プロトタイプ）
+   - Google Drive / Claude API は設定後に連携（プレースホルダ）
+   - APIキーはコード直書きせず設定ダイアログからのみ受け取る
+   ============================================================ */
+
+const STORE = {
+  weights: 'weights.v1',   // [{ts, w}]
+  meals: 'meals.v1',       // [{ts, name, kcal, img, comment, source: 'photo'|'quick'}]
+  surfs: 'surfs.v1',       // [{ts, startTs, minutes, strength, place, memo, burnKcal}]
+  config: 'config.v1',     // {claudeKey, googleId, folderMeals, folderHealth, target, limit}
+  driveFiles: 'driveFiles.v1' // {weight:fileId, meal:fileId, surf:fileId}
+};
+
+const KCAL_PER_HOUR = { easy: 200, normal: 350, hard: 500 };
+const STRENGTH_LABEL = { easy: '軽め', normal: '普通', hard: 'ハード' };
+const STRENGTH_CLASS = { easy: 's1', normal: 's2', hard: 's3' };
+
+function loadCfg(){
+  const d = JSON.parse(localStorage.getItem(STORE.config) || '{}');
+  return { target: 59.0, limit: 60.0, ...d };
+}
+function saveCfg(c){ localStorage.setItem(STORE.config, JSON.stringify(c)); }
+function loadWeights(){ return JSON.parse(localStorage.getItem(STORE.weights) || '[]'); }
+function saveWeights(a){ localStorage.setItem(STORE.weights, JSON.stringify(a)); }
+function loadMeals(){ return JSON.parse(localStorage.getItem(STORE.meals) || '[]'); }
+function saveMeals(a){ localStorage.setItem(STORE.meals, JSON.stringify(a)); }
+function loadSurfs(){ return JSON.parse(localStorage.getItem(STORE.surfs) || '[]'); }
+function saveSurfs(a){ localStorage.setItem(STORE.surfs, JSON.stringify(a)); }
+
+const fmtTime = ts => new Date(ts).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+const isoDay = ts => { const d=new Date(ts); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+const today = () => isoDay(Date.now());
+
+/* 直近の実測体重を返す（無ければ基準体重） */
+function latestWeight(){
+  const ws = loadWeights();
+  if(ws.length===0) return loadCfg().target;
+  return ws[ws.length-1].w;
+}
+
+/* サーフィン消費kcalを「直近の実測体重」で補正
+   ベースは体重60kg目安。比率= 実体重/60 で線形補正 */
+function calcBurn(strength, minutes, weightKg){
+  const base = KCAL_PER_HOUR[strength] || 350; // /h at 60kg
+  const kcal = base * (minutes/60) * (weightKg/60);
+  return Math.round(kcal);
+}
+
+/* -------- 状態表示 -------- */
+function updateStatus(){
+  const cfg = loadCfg();
+  const ws = loadWeights();
+  const todayRec = ws.filter(r=>isoDay(r.ts)===today()).pop();
+  document.getElementById('targetLabel').textContent = cfg.target.toFixed(1);
+
+  const el = document.getElementById('todayWeight');
+  const badge = document.getElementById('statusBadge');
+  const diff = document.getElementById('diffTarget');
+  if(todayRec){
+    el.innerHTML = todayRec.w.toFixed(1)+'<span class="unit">kg</span>';
+    const d = todayRec.w - cfg.target;
+    diff.textContent = (d>=0?'+':'')+d.toFixed(1)+' kg';
+    if(todayRec.w <= cfg.target){ badge.className='status ok'; badge.textContent='✓ 目標達成'; }
+    else if(todayRec.w < cfg.limit){ badge.className='status warn'; badge.textContent='⚠ あと少し（上限未満）'; }
+    else { badge.className='status over'; badge.textContent='● 上限超過'; }
+  }else{
+    el.innerHTML = '—<span class="unit">kg</span>';
+    diff.textContent='—';
+    badge.className='status ok'; badge.textContent='未入力';
+  }
+  // カロリーサマリー
+  const meals = loadMeals().filter(m=>isoDay(m.ts)===today());
+  const surfs = loadSurfs().filter(s=>isoDay(s.ts)===today());
+  const intake = meals.reduce((a,b)=>a+(b.kcal||0),0);
+  const burn = surfs.reduce((a,b)=>a+(b.burnKcal||0),0);
+  const net = intake - burn;
+  document.getElementById('todayCal').innerHTML = intake.toLocaleString()+'<span class="unit">kcal</span>';
+  document.getElementById('todayBurn').innerHTML = burn.toLocaleString()+'<span class="unit">kcal</span>';
+  const netEl = document.getElementById('todayNet');
+  netEl.innerHTML = (net>=0?'+':'')+net.toLocaleString()+'<span class="unit">kcal</span>';
+  netEl.className = 'val' + (net>1500?' pos':'');
+}
+
+/* -------- 体重記録 -------- */
+document.getElementById('btnSave').addEventListener('click', ()=>{
+  const v = parseFloat(document.getElementById('weightInput').value);
+  if(!(v>=30 && v<=150)){ alert('体重を正しく入力してください (30〜150kg)'); return; }
+  const arr = loadWeights();
+  arr.push({ts:Date.now(), w:Number(v.toFixed(2))});
+  saveWeights(arr);
+  document.getElementById('weightInput').value='';
+  updateStatus();
+  renderChart();
+  renderSurfs(); // 既存サーフィンの消費kcalも体重ベースで再計算表示
+  tryUploadWeightToDrive(arr[arr.length-1]);
+});
+
+/* -------- Chart.js -------- */
+let chart=null;
+function renderChart(){
+  const cfg = loadCfg();
+  const range = Number(document.querySelector('.seg button.active').dataset.range);
+  const now = Date.now();
+  const from = now - range*86400000;
+  const data = loadWeights().filter(r=>r.ts>=from).sort((a,b)=>a.ts-b.ts);
+
+  const labels = data.map(r=>{
+    const d=new Date(r.ts);
+    if(range<=7) return d.toLocaleDateString('ja-JP',{month:'numeric',day:'numeric'})+' '+fmtTime(r.ts);
+    if(range<=30) return (d.getMonth()+1)+'/'+d.getDate();
+    return (d.getMonth()+1)+'月';
+  });
+  const values = data.map(r=>r.w);
+  const todayRec = [...data].reverse().find(r=>isoDay(r.ts)===today());
+  const legendText = todayRec ? `本日 ${todayRec.w.toFixed(1)}kg (${fmtTime(todayRec.ts)})` : '本日 未入力';
+  document.getElementById('chartLegend').textContent = legendText;
+
+  const ctx = document.getElementById('chart').getContext('2d');
+  if(chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels,
+      datasets:[
+        {
+          label: legendText,
+          data: values,
+          borderColor:'#2E7D32',
+          backgroundColor:'rgba(76,175,80,.15)',
+          fill:true,
+          tension:.25,
+          pointRadius: values.map(v=>v>=cfg.limit?5:3),
+          pointBackgroundColor: values.map(v=> v<=cfg.target?'#2E7D32': v<cfg.limit?'#FB8C00':'#E53935'),
+          pointBorderColor:'#fff',
+          pointBorderWidth:1.5,
+        }
+      ]
+    },
+    options:{
+      responsive:true,
+      animation:{duration:400},
+      plugins:{
+        legend:{display:true,position:'bottom',labels:{boxWidth:10,font:{size:12}}},
+        tooltip:{callbacks:{label:c=>`${c.parsed.y.toFixed(1)} kg`}}
+      },
+      scales:{
+        y:{
+          suggestedMin: Math.min(cfg.target-1, ...(values.length?values:[cfg.target])) -0.5,
+          suggestedMax: Math.max(cfg.limit+1, ...(values.length?values:[cfg.limit])) +0.5,
+          ticks:{callback:v=>v.toFixed(1)+' kg',font:{size:11}},
+          grid:{color:'#ECEFF1'}
+        },
+        x:{ticks:{font:{size:10},maxRotation:0,autoSkip:true,maxTicksLimit:6},grid:{display:false}}
+      }
+    },
+    plugins:[{
+      id:'targetLines',
+      afterDraw(c){
+        const {ctx, chartArea:{left,right}, scales:{y}} = c;
+        const drawLine = (val,color,dash,label)=>{
+          const yPx = y.getPixelForValue(val);
+          ctx.save(); ctx.strokeStyle=color; ctx.setLineDash(dash); ctx.lineWidth=1.2;
+          ctx.beginPath(); ctx.moveTo(left,yPx); ctx.lineTo(right,yPx); ctx.stroke();
+          ctx.fillStyle=color; ctx.font='11px sans-serif'; ctx.textAlign='right';
+          ctx.fillText(label, right-4, yPx-4); ctx.restore();
+        };
+        drawLine(cfg.target,'#2E7D32',[4,4],`基準 ${cfg.target.toFixed(1)}kg`);
+        drawLine(cfg.limit,'#E53935',[6,3],`上限 ${cfg.limit.toFixed(1)}kg`);
+      }
+    }]
+  });
+}
+
+document.querySelectorAll('.seg button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.seg button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    renderChart();
+  });
+});
+
+/* -------- 食事画像（写真→AI解析） -------- */
+document.getElementById('mealPhoto').addEventListener('change', async (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  const ts = Date.now();
+  const dataUrl = await fileToDataURL(file);
+  const meal = { ts, name:'(解析中...)', kcal:0, img: dataUrl, comment:'', source:'photo' };
+  const meals = loadMeals(); meals.push(meal); saveMeals(meals);
+  renderMeals(); updateStatus();
+  try{
+    const analyzed = await analyzeMealWithClaude(file);
+    meal.name = analyzed.name; meal.kcal = analyzed.kcal; meal.comment = analyzed.comment;
+    saveMeals(meals); renderMeals(); updateStatus();
+  }catch(err){
+    meal.name = '(未解析)'; meal.kcal = 0; meal.comment='APIキー未設定のため解析をスキップ';
+    saveMeals(meals); renderMeals();
+  }
+  tryUploadMealToDrive(file, meal);
+  e.target.value='';
+});
+
+/* -------- 食事クイック記録 -------- */
+const dlgQuickMeal = document.getElementById('dlgQuickMeal');
+let quickMealCtx = null;
+document.querySelectorAll('.quick-btn').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    const name = b.dataset.quick;
+    const kcal = Number(b.dataset.kcal);
+    quickMealCtx = { name, kcal };
+    document.getElementById('quickMealHeader').textContent = `${b.querySelector('.ico').textContent} ${name}`;
+    const now = new Date();
+    document.getElementById('qmDate').value = isoDay(now.getTime());
+    document.getElementById('qmTime').value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    document.getElementById('qmKcal').value = kcal;
+    document.getElementById('qmMemo').value = '';
+    dlgQuickMeal.showModal();
+  });
+});
+document.getElementById('qmCancel').addEventListener('click', e=>{e.preventDefault();dlgQuickMeal.close();});
+document.getElementById('qmSave').addEventListener('click', e=>{
+  e.preventDefault();
+  if(!quickMealCtx) return;
+  const date = document.getElementById('qmDate').value;
+  const time = document.getElementById('qmTime').value;
+  const kcal = parseInt(document.getElementById('qmKcal').value)||0;
+  const memo = document.getElementById('qmMemo').value;
+  const ts = new Date(`${date}T${time}:00`).getTime();
+  const meals = loadMeals();
+  meals.push({ ts, name: quickMealCtx.name, kcal, img:'', comment: memo, source:'quick' });
+  saveMeals(meals);
+  dlgQuickMeal.close();
+  renderMeals(); updateStatus();
+});
+
+function renderMeals(){
+  const list = document.getElementById('mealList');
+  const meals = loadMeals().filter(m=>isoDay(m.ts)===today()).sort((a,b)=>a.ts-b.ts);
+  list.innerHTML = meals.map(m=>{
+    const visual = m.img ? `<img src="${m.img}" alt="meal"/>` : `<div class="meal-icon">${quickIcon(m.name)}</div>`;
+    return `
+    <div class="meal-row">
+      ${visual}
+      <div class="meal-meta" style="flex:1">
+        <b>${escapeHtml(m.name||'(解析中)')}</b> <span style="color:#2E7D32;font-weight:600">${(m.kcal||0).toLocaleString()}kcal</span><br/>
+        ${fmtTime(m.ts)} ${m.comment?'· '+escapeHtml(m.comment):''}
+      </div>
+    </div>`;
+  }).join('') || '<div class="hint">今日の記録はまだありません。</div>';
+}
+function quickIcon(name){
+  if(name?.includes('少量')) return '🥗';
+  if(name?.includes('ドカ')) return '🍔';
+  if(name?.includes('プロテイン')) return '💪';
+  if(name?.includes('普通')) return '🍱';
+  return '🍴';
+}
+function escapeHtml(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function fileToDataURL(file){return new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(file);});}
+
+/* -------- サーフィン記録 -------- */
+const dlgSurf = document.getElementById('dlgSurf');
+function refreshSurfBurnPreview(){
+  const w = latestWeight();
+  const min = parseInt(document.getElementById('sfMin').value)||0;
+  const st = document.getElementById('sfStrength').value;
+  const burn = calcBurn(st, min, w);
+  document.getElementById('sfBurnPreview').textContent = `推定消費: ${burn.toLocaleString()} kcal （体重 ${w.toFixed(1)}kg / 強度 ${STRENGTH_LABEL[st]} / ${min}分）`;
+}
+document.getElementById('btnAddSurf').addEventListener('click', ()=>{
+  const now = new Date();
+  document.getElementById('sfDate').value = isoDay(now.getTime());
+  document.getElementById('sfStart').value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  document.getElementById('sfMin').value = 90;
+  document.getElementById('sfStrength').value = 'normal';
+  document.getElementById('sfPlace').value = '';
+  document.getElementById('sfMemo').value = '';
+  refreshSurfBurnPreview();
+  dlgSurf.showModal();
+});
+['sfMin','sfStrength'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', refreshSurfBurnPreview);
+  document.getElementById(id).addEventListener('change', refreshSurfBurnPreview);
+});
+document.getElementById('sfCancel').addEventListener('click', e=>{e.preventDefault();dlgSurf.close();});
+document.getElementById('sfSave').addEventListener('click', e=>{
+  e.preventDefault();
+  const date = document.getElementById('sfDate').value;
+  const start = document.getElementById('sfStart').value;
+  const min = parseInt(document.getElementById('sfMin').value)||0;
+  const strength = document.getElementById('sfStrength').value;
+  const place = document.getElementById('sfPlace').value;
+  const memo = document.getElementById('sfMemo').value;
+  if(!date||!start||!min){ alert('日付・開始時刻・時間を入力してください'); return; }
+  const startTs = new Date(`${date}T${start}:00`).getTime();
+  const w = latestWeight();
+  const burn = calcBurn(strength, min, w);
+  const surfs = loadSurfs();
+  surfs.push({ ts: startTs, startTs, minutes:min, strength, place, memo, burnKcal:burn, weightSnapshot:w });
+  saveSurfs(surfs);
+  dlgSurf.close();
+  renderSurfs(); updateStatus();
+  trySaveSurfToDrive(surfs[surfs.length-1]);
+});
+
+function renderSurfs(){
+  const list = document.getElementById('surfList');
+  const surfs = loadSurfs().filter(s=>isoDay(s.ts)===today()).sort((a,b)=>a.ts-b.ts);
+  list.innerHTML = surfs.map(s=>{
+    const cls = STRENGTH_CLASS[s.strength]||'s2';
+    const lbl = STRENGTH_LABEL[s.strength]||'普通';
+    return `
+    <div class="surf-row">
+      <div class="ico">🏄</div>
+      <div class="info">
+        <b>${fmtTime(s.startTs)} 〜 ${s.minutes}分</b>
+        <span class="strength-pill ${cls}">${lbl}</span><br/>
+        消費 約 ${(s.burnKcal||0).toLocaleString()} kcal
+        ${s.place?' · '+escapeHtml(s.place):''}
+        ${s.memo?' · '+escapeHtml(s.memo):''}
+      </div>
+    </div>`;
+  }).join('') || '<div class="hint">今日のサーフィン記録はまだありません。</div>';
+}
+
+/* -------- Claude API（食事画像解析） -------- */
+async function analyzeMealWithClaude(file){
+  const cfg = loadCfg();
+  if(!cfg.claudeKey) throw new Error('no_api_key');
+  const b64 = (await fileToDataURL(file)).split(',')[1];
+  const body = {
+    model: "claude-opus-4-6",
+    max_tokens: 600,
+    messages:[{
+      role:"user",
+      content:[
+        {type:"image", source:{type:"base64", media_type:file.type||"image/jpeg", data:b64}},
+        {type:"text", text:
+          "食事画像を解析し、次をJSONで出力してください（余計な文を付けない）。\n"+
+          '{"name":"料理の大まかなメニュー","kcal":推定カロリー(kcal整数),"comment":"栄養バランスや注意点(60字以内)"}'
+        }
+      ]
+    }]
+  };
+  const res = await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{
+      "content-type":"application/json",
+      "x-api-key": cfg.claudeKey,
+      "anthropic-version":"2023-06-01",
+      "anthropic-dangerous-direct-browser-access":"true"
+    },
+    body: JSON.stringify(body)
+  });
+  if(!res.ok) throw new Error('api_err_'+res.status);
+  const j = await res.json();
+  const txt = j.content?.[0]?.text || '{}';
+  const m = txt.match(/\{[\s\S]*\}/);
+  return JSON.parse(m?m[0]:txt);
+}
+
+/* -------- AI総合アドバイス（サーフィン考慮、キャラクター発話を想定した構造） --------
+   出力フォーマットを構造化しておくと、後でキャラ立ち絵+音声に流し込み易い
+*/
+document.getElementById('btnAdvice').addEventListener('click', async ()=>{
+  const el = document.getElementById('aiAdvice');
+  el.textContent = '生成中...';
+  try{
+    const cfg = loadCfg();
+    if(!cfg.claudeKey){ el.textContent = '設定から Claude API Key を登録してください。'; return; }
+    const ws = loadWeights().slice(-30);
+    const ms = loadMeals().slice(-30);
+    const ss = loadSurfs().slice(-30);
+    const latestW = latestWeight();
+    const todayBurn = ss.filter(s=>isoDay(s.ts)===today()).reduce((a,b)=>a+(b.burnKcal||0),0);
+    const todayIntake = ms.filter(m=>isoDay(m.ts)===today()).reduce((a,b)=>a+(b.kcal||0),0);
+
+    const prompt = `あなたは親しみやすい健康コーチです。将来オリジナルキャラクター「ナノバナナくん」が話す前提で、口語の優しい日本語でアドバイスしてください（150〜200字、絵文字1〜2個OK）。\n\n`+
+      `【ユーザー情報】\n基準体重 ${cfg.target}kg / 上限 ${cfg.limit}kg / 直近実測 ${latestW.toFixed(1)}kg\n`+
+      `今日の摂取 ${todayIntake} kcal / サーフィン消費 ${todayBurn} kcal\n\n`+
+      `【体重(直近)】 ${JSON.stringify(ws.map(r=>({d:isoDay(r.ts),w:r.w})))}\n`+
+      `【食事(直近)】 ${JSON.stringify(ms.map(r=>({d:isoDay(r.ts),n:r.name,k:r.kcal,src:r.source})))}\n`+
+      `【サーフィン(直近)】 ${JSON.stringify(ss.map(r=>({d:isoDay(r.ts),min:r.minutes,st:r.strength,burn:r.burnKcal})))}\n\n`+
+      `観点: (1) 体重を60kg以下に維持する具体的な助言 (2) サーフィン後の食事タイミング・タンパク質/水分塩分補給 (3) 直近の食事パターンへのコメント。`;
+
+    const res = await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{"content-type":"application/json","x-api-key":cfg.claudeKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+      body: JSON.stringify({model:"claude-opus-4-6",max_tokens:600,messages:[{role:"user",content:prompt}]})
+    });
+    const j = await res.json();
+    el.textContent = j.content?.[0]?.text || '結果が取得できませんでした。';
+  }catch(e){ el.textContent = 'アドバイスの生成に失敗しました: '+e.message; }
+});
+
+/* ============================================================
+   Google Drive 連携 (drive.file スコープ限定)
+   セキュリティ: ファイル書き込み前に parent フォルダID を必ず照合
+   APIキーは設定ダイアログ経由のみ（ハードコード禁止）
+   ============================================================ */
+const DRIVE_API = 'https://www.googleapis.com/drive/v3';
+const DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+let driveTokenClient = null;
+let driveAccessToken = null;
+let driveTokenExpiresAt = 0;
+
+const EXCEL_DEF = {
+  weight: { name:'体重の記録.xlsx', headers:['年月日','時刻','体重(kg)','目標差(kg)','メモ'], sheet:'体重記録' },
+  meal:   { name:'食事の記録.xlsx', headers:['年月日','時刻','メニュー','カロリー(kcal)','画像ファイル名','AIコメント','種別'], sheet:'食事記録' },
+  surf:   { name:'サーフィン記録.xlsx', headers:['年月日','開始時刻','時間(分)','強度','推定消費(kcal)','場所','メモ','記録時体重(kg)'], sheet:'サーフィン記録' }
+};
+
+function loadDriveFiles(){ return JSON.parse(localStorage.getItem(STORE.driveFiles)||'{}'); }
+function saveDriveFiles(o){ localStorage.setItem(STORE.driveFiles, JSON.stringify(o)); }
+
+function setDriveStatus(state, label){
+  const el = document.getElementById('driveStatus');
+  el.className = 'drive-status ' + state;
+  el.textContent = label;
+}
+function toast(msg, type){
+  const t = document.createElement('div');
+  t.className = 'toast ' + (type||'');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 3000);
+}
+function driveEnabled(){
+  const c = loadCfg();
+  return Boolean(c.googleId && c.folderHealth && c.folderMeals);
+}
+
+async function getDriveToken({silent=false}={}){
+  const cfg = loadCfg();
+  if(!cfg.googleId) throw new Error('Google OAuth クライアントID未設定');
+  if(driveAccessToken && Date.now() < driveTokenExpiresAt - 30000) return driveAccessToken;
+  if(!window.google?.accounts?.oauth2){ throw new Error('Google認可スクリプト未ロード'); }
+
+  return new Promise((resolve,reject)=>{
+    const cb = (resp)=>{
+      if(resp.error){ setDriveStatus('err','☁ 認可失敗'); reject(new Error(resp.error)); return; }
+      driveAccessToken = resp.access_token;
+      driveTokenExpiresAt = Date.now() + (resp.expires_in||3600)*1000;
+      setDriveStatus('on','☁ 接続中');
+      resolve(driveAccessToken);
+    };
+    if(!driveTokenClient){
+      driveTokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: cfg.googleId, scope: DRIVE_SCOPE, callback: cb
+      });
+    }else{
+      driveTokenClient.callback = cb;
+    }
+    setDriveStatus('connecting','☁ 認可中…');
+    driveTokenClient.requestAccessToken({ prompt: silent ? '' : 'consent' });
+  });
+}
+
+async function driveFetch(url, opts={}){
+  const token = await getDriveToken({silent:true});
+  const headers = Object.assign({}, opts.headers||{}, { Authorization: 'Bearer '+token });
+  const fullUrl = url.startsWith('http') ? url : DRIVE_API+url;
+  const res = await fetch(fullUrl, Object.assign({}, opts, { headers }));
+  if(res.status===401){
+    driveAccessToken=null;
+    throw new Error('認可期限切れ');
+  }
+  if(!res.ok){
+    const txt = await res.text().catch(()=>'');
+    throw new Error(`Drive API ${res.status}: ${txt.slice(0,200)}`);
+  }
+  return res;
+}
+
+/* セキュリティ: 書き込み前にparentフォルダIDを照合 */
+async function verifyParent(fileId, expectedParentId){
+  if(!expectedParentId) throw new Error('期待するフォルダIDが未設定');
+  const r = await driveFetch(`/files/${fileId}?fields=id,name,parents`);
+  const j = await r.json();
+  if(!j.parents || !j.parents.includes(expectedParentId)){
+    throw new Error(`安全停止: ファイル(${j.name||fileId})の親フォルダが許可外 [${j.parents}] != [${expectedParentId}]`);
+  }
+  return j;
+}
+
+async function findFileInFolder(name, parentFolderId){
+  const q = encodeURIComponent(`'${parentFolderId}' in parents and name='${name.replace(/'/g,"\\'")}' and trashed=false`);
+  const r = await driveFetch(`/files?q=${q}&fields=files(id,name,parents)&pageSize=10`);
+  const j = await r.json();
+  return j.files?.[0]?.id || null;
+}
+
+function arrayBufferToBase64(buf){
+  const bytes = new Uint8Array(buf);
+  const CHUNK = 0x8000;
+  let s = '';
+  for(let i=0;i<bytes.length;i+=CHUNK){
+    s += String.fromCharCode.apply(null, bytes.subarray(i,i+CHUNK));
+  }
+  return btoa(s);
+}
+
+async function multipartUpload({metadata, mimeType, dataBuffer, method='POST', fileId, extraFields=''}){
+  const boundary = '-------drive_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+  const delim = `\r\n--${boundary}\r\n`;
+  const close = `\r\n--${boundary}--`;
+  const head = delim + 'Content-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(metadata)
+             + delim + `Content-Type: ${mimeType}\r\nContent-Transfer-Encoding: base64\r\n\r\n`;
+  const b64 = arrayBufferToBase64(dataBuffer);
+  const body = head + b64 + close;
+  const url = method==='PATCH'
+    ? `${DRIVE_UPLOAD}/${fileId}?uploadType=multipart&fields=id,name,parents${extraFields}`
+    : `${DRIVE_UPLOAD}?uploadType=multipart&fields=id,name,parents${extraFields}`;
+  const r = await driveFetch(url, {
+    method,
+    headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body
+  });
+  return await r.json();
+}
+
+async function createXlsxInDrive(kind){
+  const cfg = loadCfg();
+  const def = EXCEL_DEF[kind];
+  if(!window.XLSX) throw new Error('SheetJS未ロード');
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([def.headers]);
+  XLSX.utils.book_append_sheet(wb, ws, def.sheet);
+  const buf = XLSX.write(wb, { bookType:'xlsx', type:'array' });
+  const j = await multipartUpload({
+    metadata: { name: def.name, mimeType: XLSX_MIME, parents:[cfg.folderHealth] },
+    mimeType: XLSX_MIME,
+    dataBuffer: buf
+  });
+  // 念のため作成直後にも parent を照合
+  if(!j.parents?.includes(cfg.folderHealth)){
+    throw new Error('作成ファイルの親フォルダ不一致');
+  }
+  return j.id;
+}
+
+async function ensureExcelFile(kind){
+  const cfg = loadCfg();
+  if(!cfg.folderHealth) throw new Error('健康管理フォルダID未設定');
+  const cache = loadDriveFiles();
+  if(cache[kind]){
+    try{ await verifyParent(cache[kind], cfg.folderHealth); return cache[kind]; }
+    catch(e){ console.warn('cached fileId invalid', kind, e.message); cache[kind]=null; }
+  }
+  // 既存検索（同名）→ 無ければ新規作成
+  let id = await findFileInFolder(EXCEL_DEF[kind].name, cfg.folderHealth);
+  if(!id){
+    id = await createXlsxInDrive(kind);
+    toast(`☁ ${EXCEL_DEF[kind].name} を Drive に新規作成`, 'ok');
+  }
+  cache[kind] = id;
+  saveDriveFiles(cache);
+  return id;
+}
+
+async function appendRowToExcel(kind, row){
+  const cfg = loadCfg();
+  const fileId = await ensureExcelFile(kind);
+  await verifyParent(fileId, cfg.folderHealth); // 書き込み直前にも再照合
+  const r = await driveFetch(`/files/${fileId}?alt=media`);
+  const buf = await r.arrayBuffer();
+  const wb = XLSX.read(buf, { type:'array' });
+  const sheetName = wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  XLSX.utils.sheet_add_aoa(ws, [row], { origin: -1 });
+  const newBuf = XLSX.write(wb, { bookType:'xlsx', type:'array' });
+  await driveFetch(`${DRIVE_UPLOAD}/${fileId}?uploadType=media`, {
+    method:'PATCH',
+    headers: { 'Content-Type': XLSX_MIME },
+    body: newBuf
+  });
+}
+
+async function uploadImageToDrive(file, name){
+  const cfg = loadCfg();
+  if(!cfg.folderMeals) throw new Error('食事画像フォルダID未設定');
+  const buf = await file.arrayBuffer();
+  const meta = { name: name||`${Date.now()}.jpg`, parents:[cfg.folderMeals] };
+  const j = await multipartUpload({
+    metadata: meta, mimeType: file.type||'image/jpeg', dataBuffer: buf
+  });
+  // 必須: parent 照合
+  if(!j.parents?.includes(cfg.folderMeals)){
+    // 万一許可外フォルダに作られた場合は削除して中断
+    try{ await driveFetch(`/files/${j.id}`, { method:'DELETE' }); }catch(_){}
+    throw new Error('安全停止: 画像の親フォルダ不一致');
+  }
+  return j;
+}
+
+/* ===== 公開: 各記録の Drive 同期エントリ ===== */
+async function tryUploadWeightToDrive(rec){
+  if(!driveEnabled()) return;
+  try{
+    const d = new Date(rec.ts);
+    const row = [
+      isoDay(rec.ts),
+      `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`,
+      rec.w,
+      Number((rec.w - loadCfg().target).toFixed(2)),
+      ''
+    ];
+    await appendRowToExcel('weight', row);
+    setDriveStatus('on','☁ 同期OK');
+  }catch(e){ console.warn(e); setDriveStatus('err','☁ '+e.message.slice(0,20)); toast('Drive同期失敗: '+e.message,'err'); }
+}
+
+async function tryUploadMealToDrive(file, meal){
+  if(!driveEnabled()) return;
+  try{
+    let imgName = '';
+    if(file){
+      const d = new Date(meal.ts);
+      const stamp = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
+      const ext = (file.name.split('.').pop()||'jpg').toLowerCase();
+      imgName = `${stamp}_${Math.random().toString(36).slice(2,7)}.${ext}`;
+      await uploadImageToDrive(file, imgName);
+    }
+    const d = new Date(meal.ts);
+    const row = [
+      isoDay(meal.ts),
+      `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`,
+      meal.name||'',
+      meal.kcal||0,
+      imgName,
+      meal.comment||'',
+      meal.source||'quick'
+    ];
+    await appendRowToExcel('meal', row);
+    setDriveStatus('on','☁ 同期OK');
+  }catch(e){ console.warn(e); setDriveStatus('err','☁ '+e.message.slice(0,20)); toast('Drive同期失敗: '+e.message,'err'); }
+}
+
+async function trySaveSurfToDrive(rec){
+  if(!driveEnabled()) return;
+  try{
+    const d = new Date(rec.startTs);
+    const row = [
+      isoDay(rec.startTs),
+      `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`,
+      rec.minutes,
+      STRENGTH_LABEL[rec.strength]||rec.strength,
+      rec.burnKcal||0,
+      rec.place||'',
+      rec.memo||'',
+      rec.weightSnapshot||0
+    ];
+    await appendRowToExcel('surf', row);
+    setDriveStatus('on','☁ 同期OK');
+  }catch(e){ console.warn(e); setDriveStatus('err','☁ '+e.message.slice(0,20)); toast('Drive同期失敗: '+e.message,'err'); }
+}
+
+/* Drive状態の手動再接続 */
+document.getElementById('driveStatus').addEventListener('click', async ()=>{
+  if(!driveEnabled()){
+    toast('⚙ 設定で Google ID とフォルダID 2つを登録してください','err');
+    return;
+  }
+  try{
+    await getDriveToken({silent:false});
+    // 起動時に Excel ファイルを 3 種すべて準備
+    setDriveStatus('connecting','☁ 準備中…');
+    await ensureExcelFile('weight');
+    await ensureExcelFile('meal');
+    await ensureExcelFile('surf');
+    setDriveStatus('on','☁ 接続OK');
+    toast('Driveに接続し、Excelファイルを準備しました','ok');
+  }catch(e){
+    setDriveStatus('err','☁ 失敗');
+    toast('接続失敗: '+e.message,'err');
+  }
+});
+
+/* -------- 設定ダイアログ -------- */
+const dlg = document.getElementById('dlgSettings');
+document.getElementById('btnSettings').addEventListener('click', ()=>{
+  const c = loadCfg();
+  document.getElementById('cfgClaude').value = c.claudeKey||'';
+  document.getElementById('cfgGoogleId').value = c.googleId||'';
+  document.getElementById('cfgFolderMeals').value = c.folderMeals||'';
+  document.getElementById('cfgFolderHealth').value = c.folderHealth||'';
+  document.getElementById('cfgTarget').value = c.target ?? 59.0;
+  document.getElementById('cfgLimit').value = c.limit ?? 60.0;
+  dlg.showModal();
+});
+document.getElementById('cfgCancel').addEventListener('click', e=>{e.preventDefault();dlg.close();});
+document.getElementById('cfgSave').addEventListener('click', e=>{
+  e.preventDefault();
+  saveCfg({
+    claudeKey: document.getElementById('cfgClaude').value.trim(),
+    googleId: document.getElementById('cfgGoogleId').value.trim(),
+    folderMeals: document.getElementById('cfgFolderMeals').value.trim(),
+    folderHealth: document.getElementById('cfgFolderHealth').value.trim(),
+    target: parseFloat(document.getElementById('cfgTarget').value)||59.0,
+    limit: parseFloat(document.getElementById('cfgLimit').value)||60.0,
+  });
+  dlg.close();
+  updateStatus();
+  renderChart();
+  renderSurfs();
+  refreshDriveStatusLabel();
+});
+
+function refreshDriveStatusLabel(){
+  if(driveEnabled()){
+    if(driveAccessToken) setDriveStatus('on','☁ 接続OK');
+    else setDriveStatus('off','☁ 未接続(タップで認可)');
+  }else{
+    setDriveStatus('off','☁ 未設定');
+  }
+}
+
+/* -------- 初期化 / デモデータ -------- */
+(function init(){
+  if(loadWeights().length===0){
+    const demo=[]; const base=59.2;
+    for(let i=13;i>=0;i--){
+      const t = Date.now()-i*86400000 + 8*3600000;
+      demo.push({ts:t, w: Number((base + Math.sin(i/2)*0.6 + (Math.random()-.5)*0.3 - (i>8?0.2:0)).toFixed(1))});
+    }
+    saveWeights(demo);
+  }
+  updateStatus();
+  renderChart();
+  renderMeals();
+  renderSurfs();
+  refreshDriveStatusLabel();
+})();
+</script>
+</body>
+</html>

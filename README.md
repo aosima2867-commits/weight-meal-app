@@ -1,2 +1,210 @@
-# weight-meal-app
-体重と食事管理アプリ
+# 体重 & 食事 & サーフィン管理アプリ（プロトタイプ v0.3）
+
+シンプルな誘導デザインで、毎日の体重・食事・サーフィンを記録し、
+Claude API で食事画像を解析、**Google Drive に自動保存** されるアプリです。
+
+> ⚠️ 本ファイル群は **プロトタイプ（案C）** です。
+> Google Drive / Claude API は **設定後に有効化** されます。
+> 設定がない間はブラウザ内（localStorage）にのみ保存されます。
+
+---
+
+## 🆕 v0.3 の追加機能（Google Drive 連携）
+
+| 機能 | 内容 |
+|---|---|
+| ☁ Drive 自動同期 | 体重・食事・サーフィンの全記録を **健康管理フォルダの Excel に自動追記** |
+| 🖼 食事画像アップロード | 食事画像を **食事画像フォルダに自動保存**（YYYYMMDD_HHMM_xxxxx.jpg） |
+| 📋 Excel 自動作成 | 初回接続時に `体重の記録.xlsx` `食事の記録.xlsx` `サーフィン記録.xlsx` を **アプリが Drive 上に自動作成**（手動アップ不要） |
+| 🔒 フォルダID照合 | 全ての書き込み前に親フォルダIDを検証。許可外フォルダへの書込みは即座に中断 |
+| 📡 接続状態 | 画面右上に ☁ 状態を表示 / タップで再接続 |
+
+---
+
+## 📦 含まれるファイル
+
+| ファイル | 説明 |
+|---|---|
+| `index.html` | メインUI（PWA本体）。Drive連携を含む |
+| `manifest.json` | iPhone ホーム画面追加用 |
+| `体重の記録.xlsx` | 雛形（参考。アプリが自動作成するので Drive にアップ不要） |
+| `食事の記録.xlsx` | 雛形（同上） |
+| `サーフィン記録.xlsx` | 雛形（同上） |
+| `SECURITY_NOTES.md` | **必ず読む** セキュリティ/開発ルール |
+| `.env.example` | APIキー設定テンプレート |
+| `.gitignore` | Git除外設定 |
+| `README.md` | このファイル |
+
+---
+
+## 🛠 セットアップ手順（重要）
+
+### 全体像
+
+```
+[STEP A] GitHub アカウント & GitHub Pages デプロイ → URL 取得
+   ↓
+[STEP B] Google Cloud Console で OAuth 設定 → クライアントID 取得
+   ↓
+[STEP C] Google Drive で 2 フォルダ作成 → フォルダID 取得
+   ↓
+[STEP D] Claude API Key 取得
+   ↓
+[STEP E] アプリの「⚙ 設定」に全て入力 → ☁ 状態をタップして認可
+```
+
+---
+
+### STEP A. GitHub Pages デプロイ
+
+1. https://github.com/signup でアカウント作成
+2. New repository → 名前 `weight-meal-app` / Public / README追加 → Create
+3. Add file → Upload files → このフォルダの中身を全選択してドラッグ → Commit
+4. Settings → Pages → Source: `main` / `/ (root)` → Save
+5. 数分待ち、`https://<ユーザー名>.github.io/weight-meal-app/` が発行される
+
+---
+
+### STEP B. Google Cloud Console で OAuth 設定
+
+1. https://console.cloud.google.com/ にアクセス（Google アカウントでログイン）
+2. 上部のプロジェクト選択 → 「新しいプロジェクト」→ 名前 `weight-meal-app` → 作成
+3. 左メニュー「APIとサービス」→「ライブラリ」
+4. **「Google Drive API」を検索 → 有効にする**
+5. 左メニュー「APIとサービス」→「OAuth同意画面」
+   - User Type: **外部** → 作成
+   - アプリ名: `体重・食事管理アプリ`
+   - サポートメール: 自分のメール
+   - デベロッパー連絡先: 自分のメール
+   - 保存して次へ
+   - スコープ: そのまま「保存して次へ」
+   - **テストユーザー**: 「+ ADD USERS」→ 自分の Gmail を追加
+   - 保存して次へ → ダッシュボードに戻る
+6. 左メニュー「APIとサービス」→「認証情報」
+7. **「+ 認証情報を作成」→「OAuth クライアント ID」**
+   - アプリケーションの種類: **ウェブアプリケーション**
+   - 名前: `weight-meal-app`
+   - **承認済みの JavaScript 生成元** に追加:
+     - `https://<ユーザー名>.github.io`（GitHub Pages の URL のホスト部分のみ）
+     - `http://localhost:8000`（ローカルテスト用）
+   - **承認済みのリダイレクトURI**: 不要（GIS では使いません）
+   - 作成
+8. 表示された **クライアントID** をコピーして控える（`xxxxx.apps.googleusercontent.com` 形式）
+   - クライアントシークレットは **使いません**（ブラウザアプリでは保存禁止）
+
+---
+
+### STEP C. Drive のフォルダ作成
+
+1. https://drive.google.com/ にアクセス
+2. マイドライブ で右クリック → 「新しいフォルダ」→ **「食事画像」** 作成
+3. 同様に **「健康管理」** 作成
+4. それぞれフォルダを開き、ブラウザのアドレスバーから **末尾の文字列**（フォルダID）をコピー
+   - 例: `https://drive.google.com/drive/folders/1AbCdEfGhIjKlMnOpQrStUv` → `1AbCdEfGhIjKlMnOpQrStUv`
+5. 「食事画像」「健康管理」の 2 つのフォルダIDをそれぞれ控える
+
+> ⚠️ アプリは **この 2 フォルダ以外には一切アクセスしません**。
+> （OAuth スコープ `drive.file` + 全書き込み時に親フォルダID照合の二重防御）
+
+---
+
+### STEP D. Claude API Key
+
+1. https://console.anthropic.com/ でアカウント作成
+2. 「API Keys」→ Create Key → コピー（`sk-ant-` で始まる）
+
+---
+
+### STEP E. アプリ設定
+
+1. iPhone か PC で アプリの URL を開く
+2. 右上 **「⚙ 設定」** をタップ
+3. 以下を入力:
+   - **Claude API Key**: STEP D で取得
+   - **Google OAuth Client ID**: STEP B-8 で取得
+   - **Drive フォルダID「食事画像」**: STEP C で取得
+   - **Drive フォルダID「健康管理」**: STEP C で取得
+   - 基準体重 / 上限体重: 必要なら変更
+4. **保存**
+5. 画面右上 **「☁ 未接続」をタップ**
+6. Google ログイン画面が出るのでログイン → アクセスを許可
+7. **「☁ 接続OK」** に変われば成功！自動で Excel 3 ファイルが Drive 上に作成されます
+8. 体重を入力すると、ローカル保存と同時に Drive 上の Excel に自動追記されます
+
+---
+
+## 🔒 セキュリティ動作確認チェックリスト
+
+設定後、以下を確認すると安全に運用できます。
+
+- [ ] アプリの「☁ 接続OK」状態で 体重 1 件入力
+- [ ] Drive の **健康管理 フォルダ** を開いて `体重の記録.xlsx` が作られているか
+- [ ] Excel を開いて 1 行追記されているか
+- [ ] 食事の画像を 1 件追加し、**食事画像 フォルダ** に画像が保存されているか
+- [ ] **マイドライブの他のフォルダに何も作成されていない** ことを目視確認
+- [ ] DevTools の Network タブを開き、`googleapis.com` と `anthropic.com` 以外への送信が無いことを確認
+
+万が一、許可外フォルダにファイルが作られた場合は **アプリが自動で削除して中断** します（コード `uploadImageToDrive` 内の安全停止処理）。
+
+---
+
+## 🏄 サーフィン消費カロリーの計算方法
+
+```
+推定 = 強度別カロリー(/h) × (時間/60) × (直近実測体重/60)
+```
+
+| 強度 | 60kg基準 |
+|---|---|
+| 軽め (波待ち多め) | 200 kcal/h |
+| 普通 (パドル中心) | 350 kcal/h |
+| ハード (連続ライディング) | 500 kcal/h |
+
+例: 体重58.5kg、強度「普通」、90分 → 350 × 1.5 × (58.5/60) ≒ **512 kcal**
+
+---
+
+## 🎨 キャラクター化計画（次フェーズ）
+
+機能面が固まり次第、AI アドバイスをオリジナルキャラクターが喋る形に拡張します。
+現在のアバター枠（🧑‍⚕️ プレースホルダ）が差替えポイントです。
+
+| 要素 | 採用候補 |
+|---|---|
+| キャラ立ち絵 | NANOBANANA でリアル人物生成 |
+| 表情 | 笑顔 / 真顔 / 励まし / 心配 の 4 枚 |
+| 動き | Live2D / Lottie / 短尺 WebM |
+| 音声 | OpenAI TTS / ElevenLabs / VOICEVOX |
+| セリフ | 既存 Claude API の出力 |
+
+---
+
+## ❓ トラブルシュート
+
+| 症状 | 対処 |
+|---|---|
+| ☁ 認可失敗 | OAuth同意画面のテストユーザーに自分の Gmail が登録されているか確認 |
+| `redirect_uri_mismatch` | OAuth クライアントの「承認済みJavaScript生成元」に GitHub Pages の URL が登録されているか |
+| 「This app isn't verified」と表示 | テスト中なので正常。「Advanced」→「Go to ... (unsafe)」で進めます（自分のアプリなので OK） |
+| Excel が作成されない | 健康管理フォルダIDが正しいか、☁ をタップして再接続 |
+| iPhone で動かない | `file://` だと OAuth が動きません。GitHub Pages 等の `https://` URL が必須 |
+| APIキーが漏れないか | 設定値はブラウザの localStorage にのみ保存され、外部送信は API 呼出時のみ |
+
+---
+
+## 📡 通信先一覧（透明化）
+
+このアプリが通信する先は以下のみです。
+
+| 通信先 | 目的 |
+|---|---|
+| `cdn.jsdelivr.net` | Chart.js / SheetJS の取得（CDN） |
+| `accounts.google.com` | OAuth 認可フロー |
+| `www.googleapis.com` | Google Drive API（drive.file スコープ限定） |
+| `api.anthropic.com` | Claude API（食事解析・健康アドバイス） |
+
+それ以外への送信はありません（ソース内 grep で確認可能）。
+
+---
+
+© 2026 — プロトタイプ v0.3 / 再配布時は SECURITY_NOTES.md を同梱してください。
