@@ -208,3 +208,4 @@ Claude API で食事画像を解析、**Google Drive に自動保存** される
 ---
 
 © 2026 — プロトタイプ v0.3 / 再配布時は SECURITY_NOTES.md を同梱してください。
+   
