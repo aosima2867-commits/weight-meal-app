@@ -62,7 +62,7 @@
   .upload{display:flex;flex-direction:column;gap:6px;}
   .upload label{display:block;background:#FFF8E1;color:#6D4C41;padding:12px;border-radius:12px;text-align:center;font-weight:600;cursor:pointer;border:1.5px dashed #FFCA28;font-size:14px;}
   .upload input[type=file]{display:none}
-  .quick-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
+  .quick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
   .quick-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;border:1.5px solid var(--border);background:#FAFBFA;border-radius:12px;cursor:pointer;gap:4px;font-family:inherit;transition:all .1s}
   .quick-btn:active{transform:scale(.96);background:#F1F8E9;border-color:var(--green)}
   .quick-btn .ico{font-size:24px;line-height:1}
@@ -164,6 +164,9 @@
     <input type="number" class="weight-input" id="weightInput" step="0.1" min="30" max="150" placeholder="例: 59.4" inputmode="decimal"/>
     <button class="primary" id="btnSave">記録</button>
   </div>
+  <div style="text-align:right;margin-top:6px">
+    <button class="settings-btn" id="btnPastWeight" style="color:var(--green-dark);font-weight:600">📅 過去の日時で記録</button>
+  </div>
 
   <div class="summary-grid">
     <div class="summary-cell intake">
@@ -220,18 +223,13 @@
     <button class="quick-btn" data-quick="プロテイン12g" data-kcal="60">
       <div class="ico">💪</div><div class="ttl">プロテイン</div><div class="kcal">タンパク質 12g / 60 kcal</div>
     </button>
+    <button class="quick-btn" data-quick="間食" data-kcal="150">
+      <div class="ico">🍪</div><div class="ttl">間食</div><div class="kcal">菓子等 / 約 150 kcal</div>
+    </button>
   </div>
 
   <div id="mealList"></div>
   <div class="hint">画像は Drive「食事画像」へ、解析結果は「健康管理/食事の記録.xlsx」へ保存。クイック記録も同じExcelに記録されます。</div>
-</section>
-
-<!-- サーフィン記録 -->
-<section class="card" aria-label="サーフィン記録">
-  <h2>🏄 サーフィン記録</h2>
-  <button class="surf" id="btnAddSurf">＋ 今日のサーフィンを記録</button>
-  <div id="surfList"></div>
-  <div class="hint">サーフィン後の食事タイミング・量のアドバイスに使われます。グラフ上のアイコンをタップすると詳細表示。</div>
 </section>
 
 <!-- 一日一清 -->
@@ -255,6 +253,14 @@
 
   <div id="gaList"></div>
   <div class="hint">良い習慣を続けて、自分にご褒美を許可しましょう。30,000pt 達成時に「ご褒美ボタン」が出現します。</div>
+</section>
+
+<!-- サーフィン記録 -->
+<section class="card" aria-label="サーフィン記録">
+  <h2>🏄 サーフィン記録</h2>
+  <button class="surf" id="btnAddSurf">＋ 今日のサーフィンを記録</button>
+  <div id="surfList"></div>
+  <div class="hint">サーフィン後の食事タイミング・量のアドバイスに使われます。グラフ上のアイコンをタップすると詳細表示。</div>
 </section>
 
 <!-- AIアドバイス（将来キャラクター化を想定） -->
@@ -317,6 +323,20 @@
   <div class="actions">
     <button class="cancel" id="qmCancel">キャンセル</button>
     <button class="ok" id="qmSave">記録する</button>
+  </div>
+</dialog>
+
+<!-- 過去日時で体重記録するダイアログ -->
+<dialog id="dlgPastWeight">
+  <h3>📅 過去の日時で体重を記録</h3>
+  <div class="hint" style="margin-bottom:8px">記録し忘れた日の体重をさかのぼって入力できます。</div>
+  <label>日付<input type="date" id="pwDate"/></label>
+  <label>時刻<input type="time" id="pwTime"/></label>
+  <label>体重 (kg)<input type="number" id="pwWeight" step="0.1" min="30" max="150" placeholder="例: 59.4" inputmode="decimal"/></label>
+  <label>メモ (任意)<input type="text" id="pwMemo" placeholder="例: 朝起きてすぐ"/></label>
+  <div class="actions">
+    <button class="cancel" id="pwCancel">キャンセル</button>
+    <button class="ok" id="pwSave">記録する</button>
   </div>
 </dialog>
 
@@ -522,8 +542,47 @@ document.getElementById('btnSave').addEventListener('click', ()=>{
   document.getElementById('weightInput').value='';
   updateStatus();
   renderChart();
+  attachSurfChartTap();
   renderSurfs(); // 既存サーフィンの消費kcalも体重ベースで再計算表示
   tryUploadWeightToDrive(arr[arr.length-1]);
+});
+
+/* -------- 過去日時で体重記録 -------- */
+const dlgPastWeight = document.getElementById('dlgPastWeight');
+document.getElementById('btnPastWeight').addEventListener('click', ()=>{
+  const now = new Date();
+  const todayStr = isoDay(now.getTime());
+  const pwDate = document.getElementById('pwDate');
+  pwDate.value = todayStr;
+  pwDate.max = todayStr; // 未来日入力禁止
+  document.getElementById('pwTime').value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  document.getElementById('pwWeight').value = '';
+  document.getElementById('pwMemo').value = '';
+  dlgPastWeight.showModal();
+});
+document.getElementById('pwCancel').addEventListener('click', e=>{e.preventDefault();dlgPastWeight.close();});
+document.getElementById('pwSave').addEventListener('click', e=>{
+  e.preventDefault();
+  const date = document.getElementById('pwDate').value;
+  const time = document.getElementById('pwTime').value;
+  const w = parseFloat(document.getElementById('pwWeight').value);
+  const memo = document.getElementById('pwMemo').value;
+  if(!date||!time){ alert('日付・時刻を入力してください'); return; }
+  if(!(w>=30 && w<=150)){ alert('体重を正しく入力してください (30〜150kg)'); return; }
+  const ts = new Date(`${date}T${time}:00`).getTime();
+  if(ts > Date.now()){ alert('未来の日時は記録できません'); return; }
+  const arr = loadWeights();
+  const rec = { ts, w: Number(w.toFixed(2)), memo };
+  arr.push(rec);
+  arr.sort((a,b)=>a.ts-b.ts); // 時系列順
+  saveWeights(arr);
+  dlgPastWeight.close();
+  updateStatus();
+  renderChart();
+  attachSurfChartTap();
+  renderSurfs();
+  toast(`${date} ${time} に ${w.toFixed(1)}kg を記録`, 'ok');
+  tryUploadWeightToDrive(rec);
 });
 
 /* -------- Chart.js -------- */
@@ -768,6 +827,7 @@ function quickIcon(name){
   if(name?.includes('少量')) return '🥗';
   if(name?.includes('ドカ')) return '🍔';
   if(name?.includes('プロテイン')) return '💪';
+  if(name?.includes('間食')) return '🍪';
   if(name?.includes('普通')) return '🍱';
   return '🍴';
 }
@@ -1303,7 +1363,7 @@ async function tryUploadWeightToDrive(rec){
       `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`,
       rec.w,
       Number((rec.w - loadCfg().target).toFixed(2)),
-      ''
+      rec.memo||''
     ];
     await appendRowToExcel('weight', row);
     setDriveStatus('on','☁ 同期OK');
