@@ -112,6 +112,28 @@
   @keyframes toastIn{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
   .toast.err{background:rgba(229,57,53,.95)}
   .toast.ok{background:rgba(46,125,50,.95)}
+  /* 一日一清 */
+  .ga-points{background:linear-gradient(135deg,#FFF8E1 0%,#FFECB3 100%);border-radius:12px;padding:12px;margin-bottom:10px}
+  .ga-pts-row{display:flex;align-items:baseline;gap:6px}
+  .ga-pts-num{font-size:30px;font-weight:800;color:#E65100;letter-spacing:-.02em;line-height:1}
+  .ga-pts-num small{font-size:14px;color:#FB8C00;font-weight:700}
+  .ga-pts-target{font-size:13px;color:#8D6E63;font-weight:600}
+  .ga-bar{height:10px;background:#FFE0B2;border-radius:999px;margin-top:8px;overflow:hidden}
+  .ga-bar-fill{height:100%;background:linear-gradient(90deg,#FB8C00,#FFD54F);border-radius:999px;transition:width .4s;width:0%}
+  .ga-summary{font-size:11px;color:#8D6E63;margin-top:6px;font-weight:600}
+  button.goodact{background:#FB8C00;color:#fff;border:none;padding:12px 16px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 2px 0 #E65100;width:100%;margin-top:6px;font-family:inherit}
+  button.goodact:active{transform:translateY(1px);box-shadow:0 1px 0 #E65100}
+  button.reward{background:linear-gradient(135deg,#FFD54F,#FFA726);color:#5D4037;border:none;padding:14px 16px;border-radius:12px;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 3px 0 #E65100,0 0 0 3px #FFE082;width:100%;margin-top:8px;font-family:inherit;animation:rewardPulse 1.5s infinite}
+  button.reward:active{transform:translateY(1px);box-shadow:0 1px 0 #E65100,0 0 0 3px #FFE082}
+  @keyframes rewardPulse{0%,100%{box-shadow:0 3px 0 #E65100,0 0 0 3px #FFE082}50%{box-shadow:0 3px 0 #E65100,0 0 0 6px #FFE082}}
+  .ga-row{display:flex;gap:10px;align-items:center;padding:8px 10px;background:#FFF8E1;border-radius:10px;margin-top:6px;font-size:12px}
+  .ga-row .ico{font-size:20px}
+  .ga-row .info{flex:1}
+  .ga-row .info b{font-size:13px}
+  .ga-row .pts{color:#E65100;font-weight:700;font-size:13px}
+  .ga-edit-row{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #ECEFF1}
+  .ga-edit-row input{flex:1;padding:6px 10px;border:1px solid #ECEFF1;border-radius:8px;font-size:13px}
+  .ga-edit-row button.del{background:#FFEBEE;color:#E53935;border:none;padding:6px 10px;border-radius:8px;font-weight:600;font-size:11px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -209,7 +231,30 @@
   <h2>🏄 サーフィン記録</h2>
   <button class="surf" id="btnAddSurf">＋ 今日のサーフィンを記録</button>
   <div id="surfList"></div>
-  <div class="hint">サーフィン後の食事タイミング・量のアドバイスに使われます。</div>
+  <div class="hint">サーフィン後の食事タイミング・量のアドバイスに使われます。グラフ上のアイコンをタップすると詳細表示。</div>
+</section>
+
+<!-- 一日一清 -->
+<section class="card" aria-label="一日一清">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <h2 style="margin:0">🌟 一日一清</h2>
+    <button class="settings-btn" id="btnEditActs">✏ 項目編集</button>
+  </div>
+
+  <div class="ga-points">
+    <div class="ga-pts-row">
+      <div class="ga-pts-num"><span id="gaCurrent">0</span> <small>pt</small></div>
+      <div class="ga-pts-target">/ <span id="gaCycleTarget">30,000</span> pt</div>
+    </div>
+    <div class="ga-bar"><div class="ga-bar-fill" id="gaBar"></div></div>
+    <div class="ga-summary"><span id="gaTotalDone">0件 達成</span> · <span id="gaTodayDone">本日 0件</span></div>
+  </div>
+
+  <button class="goodact" id="btnAddGoodAct">＋ 一日一清を記録（+200pt）</button>
+  <button class="reward" id="btnReward" style="display:none">🎁 ご褒美を使う（-30,000pt）</button>
+
+  <div id="gaList"></div>
+  <div class="hint">良い習慣を続けて、自分にご褒美を許可しましょう。30,000pt 達成時に「ご褒美ボタン」が出現します。</div>
 </section>
 
 <!-- AIアドバイス（将来キャラクター化を想定） -->
@@ -275,6 +320,61 @@
   </div>
 </dialog>
 
+<!-- サーフィン詳細ダイアログ（グラフアイコンタップ時） -->
+<dialog id="dlgSurfDetail">
+  <h3 id="sdTitle">🏄 サーフィン詳細</h3>
+  <div id="sdBody"></div>
+  <div class="actions">
+    <button class="cancel" onclick="document.getElementById('dlgSurfDetail').close()">閉じる</button>
+  </div>
+</dialog>
+
+<!-- 一日一清 記録ダイアログ -->
+<dialog id="dlgGoodAct">
+  <h3>🌟 一日一清を記録</h3>
+  <label>日付<input type="date" id="gaDate"/></label>
+  <label>時刻<input type="time" id="gaTime"/></label>
+  <label>内容<select id="gaActivity"></select></label>
+  <label>メモ (任意)<input type="text" id="gaMemo" placeholder="例: 朝の習慣として"/></label>
+  <div style="margin-top:10px;padding:8px;background:#FFF8E1;border-radius:8px;font-size:13px;color:#E65100;font-weight:700;text-align:center">
+    獲得 +200 pt
+  </div>
+  <div class="actions">
+    <button class="cancel" id="gaCancel">キャンセル</button>
+    <button class="ok" id="gaSave" style="background:#FB8C00">記録する</button>
+  </div>
+</dialog>
+
+<!-- 一日一清 項目編集ダイアログ -->
+<dialog id="dlgEditActs">
+  <h3>✏ 項目を編集</h3>
+  <div class="hint" style="margin-bottom:8px">タップで編集 / ゴミ箱で削除 / 一番下に追加</div>
+  <div id="editActsList" style="max-height:50vh;overflow-y:auto"></div>
+  <div style="display:flex;gap:6px;margin-top:10px">
+    <input type="text" id="newActInput" placeholder="新しい項目を入力" style="flex:1;padding:8px 10px;border:1px solid #ECEFF1;border-radius:8px;font-size:13px"/>
+    <button class="ok" id="addActBtn" style="background:#FB8C00">＋ 追加</button>
+  </div>
+  <div class="actions">
+    <button class="ok" id="editActsClose">完了</button>
+  </div>
+</dialog>
+
+<!-- ご褒美使用確認ダイアログ -->
+<dialog id="dlgReward">
+  <h3>🎁 ご褒美を使いますか？</h3>
+  <div style="font-size:13px;color:var(--text);margin-top:8px;line-height:1.6">
+    30,000 pt を消費して、自分にご褒美を許可します。<br/>
+    余ったポイントは次のサイクルに引き継がれます。
+  </div>
+  <label>ご褒美の内容 (任意・記録に残ります)
+    <input type="text" id="rwMemo" placeholder="例: 好きなレストランで外食"/>
+  </label>
+  <div class="actions">
+    <button class="cancel" id="rwCancel">キャンセル</button>
+    <button class="ok" id="rwOK" style="background:linear-gradient(135deg,#FFD54F,#FFA726);color:#5D4037">使う</button>
+  </div>
+</dialog>
+
 <!-- サーフィン記録ダイアログ -->
 <dialog id="dlgSurf">
   <h3>🏄 サーフィン記録</h3>
@@ -309,9 +409,21 @@ const STORE = {
   weights: 'weights.v1',   // [{ts, w}]
   meals: 'meals.v1',       // [{ts, name, kcal, img, comment, source: 'photo'|'quick'}]
   surfs: 'surfs.v1',       // [{ts, startTs, minutes, strength, place, memo, burnKcal}]
+  goodActs: 'goodActs.v1', // [{ts, activity, points, memo}]
+  goodList: 'goodList.v1', // ["風呂掃除", ...]
+  goodRewards: 'goodRewards.v1', // [{ts, points:-30000, memo}]
   config: 'config.v1',     // {claudeKey, googleId, folderMeals, folderHealth, target, limit}
-  driveFiles: 'driveFiles.v1' // {weight:fileId, meal:fileId, surf:fileId}
+  driveFiles: 'driveFiles.v1' // {weight:fileId, meal:fileId, surf:fileId, goodact:fileId}
 };
+
+const POINTS_PER_ACT = 200;
+const REWARD_COST = 30000;
+
+const DEFAULT_GOOD_ACTS = [
+  '風呂掃除','床掃除','ごみ・プラゴミ出し','洗濯物干し畳み',
+  '食事の準備','食器の片付け','玄関掃除','墓参り',
+  '母施設面会','語学勉強','読書','音楽活動','映画鑑賞'
+];
 
 const KCAL_PER_HOUR = { easy: 200, normal: 350, hard: 500 };
 const STRENGTH_LABEL = { easy: '軽め', normal: '普通', hard: 'ハード' };
@@ -328,6 +440,23 @@ function loadMeals(){ return JSON.parse(localStorage.getItem(STORE.meals) || '[]
 function saveMeals(a){ localStorage.setItem(STORE.meals, JSON.stringify(a)); }
 function loadSurfs(){ return JSON.parse(localStorage.getItem(STORE.surfs) || '[]'); }
 function saveSurfs(a){ localStorage.setItem(STORE.surfs, JSON.stringify(a)); }
+function loadGoodActs(){ return JSON.parse(localStorage.getItem(STORE.goodActs)||'[]'); }
+function saveGoodActs(a){ localStorage.setItem(STORE.goodActs, JSON.stringify(a)); }
+function loadGoodList(){
+  const raw = localStorage.getItem(STORE.goodList);
+  if(!raw) return [...DEFAULT_GOOD_ACTS];
+  try{ const a = JSON.parse(raw); return Array.isArray(a)&&a.length?a:[...DEFAULT_GOOD_ACTS]; }catch(_){ return [...DEFAULT_GOOD_ACTS]; }
+}
+function saveGoodList(a){ localStorage.setItem(STORE.goodList, JSON.stringify(a)); }
+function loadGoodRewards(){ return JSON.parse(localStorage.getItem(STORE.goodRewards)||'[]'); }
+function saveGoodRewards(a){ localStorage.setItem(STORE.goodRewards, JSON.stringify(a)); }
+function calcGoodPoints(){
+  const acts = loadGoodActs();
+  const rewards = loadGoodRewards();
+  const earned = acts.reduce((a,b)=>a+(b.points||POINTS_PER_ACT),0);
+  const spent = rewards.reduce((a,b)=>a+Math.abs(b.points||REWARD_COST),0);
+  return earned - spent;
+}
 
 const fmtTime = ts => new Date(ts).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
 const isoDay = ts => { const d=new Date(ts); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
@@ -469,8 +598,93 @@ function renderChart(){
         drawLine(cfg.target,'#2E7D32',[4,4],`基準 ${cfg.target.toFixed(1)}kg`);
         drawLine(cfg.limit,'#E53935',[6,3],`上限 ${cfg.limit.toFixed(1)}kg`);
       }
+    },{
+      id:'surfMarkers',
+      afterDatasetsDraw(c){
+        const {ctx, chartArea, scales:{x:xScale}} = c;
+        const surfs = loadSurfs();
+        // データポイントごとの日付キーを取得
+        const dataPoints = data.map(r=>({ts:r.ts, day:isoDay(r.ts), month:new Date(r.ts).getFullYear()+'-'+String(new Date(r.ts).getMonth()+1).padStart(2,'0')}));
+        // サーフィンの集約キー
+        const surfKeys = new Set();
+        const surfsByKey = {}; // key -> [surfs]
+        surfs.forEach(s=>{
+          const d = new Date(s.startTs);
+          const dayKey = isoDay(s.startTs);
+          const monthKey = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+          if(range<=30){
+            surfKeys.add(dayKey);
+            (surfsByKey[dayKey] = surfsByKey[dayKey]||[]).push(s);
+          }else{
+            surfKeys.add(monthKey);
+            (surfsByKey[monthKey] = surfsByKey[monthKey]||[]).push(s);
+          }
+        });
+        // 各データポイントの位置にアイコン描画（重複は1個に）
+        const drawn = new Set();
+        chartSurfHitAreas = []; // タップ判定用
+        ctx.save();
+        ctx.font = '16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        dataPoints.forEach((dp,i)=>{
+          const key = range<=30 ? dp.day : dp.month;
+          if(!surfKeys.has(key) || drawn.has(key)) return;
+          drawn.add(key);
+          const xPx = xScale.getPixelForValue(i);
+          const yPx = chartArea.top + 12;
+          // 半透明丸背景
+          ctx.fillStyle = 'rgba(0,172,193,.18)';
+          ctx.beginPath(); ctx.arc(xPx, yPx, 12, 0, Math.PI*2); ctx.fill();
+          // 🏄 アイコン
+          ctx.fillStyle = '#000';
+          ctx.fillText('🏄', xPx, yPx);
+          // タップ判定エリアを記録（半径16のヒットエリア）
+          chartSurfHitAreas.push({x:xPx, y:yPx, r:18, key, surfs: surfsByKey[key]});
+        });
+        ctx.restore();
+      }
     }]
   });
+}
+
+let chartSurfHitAreas = [];
+
+/* チャートのサーフィンアイコンタップで詳細表示 */
+function attachSurfChartTap(){
+  const canvas = document.getElementById('chart');
+  if(canvas._surfTapAttached) return;
+  canvas._surfTapAttached = true;
+  canvas.addEventListener('click', (e)=>{
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    for(const a of chartSurfHitAreas){
+      const dx = x-a.x, dy = y-a.y;
+      if(dx*dx + dy*dy <= a.r*a.r){
+        showSurfDetail(a.surfs, a.key);
+        return;
+      }
+    }
+  });
+}
+
+function showSurfDetail(surfs, key){
+  const dlg = document.getElementById('dlgSurfDetail');
+  const title = document.getElementById('sdTitle');
+  const body = document.getElementById('sdBody');
+  title.textContent = `🏄 ${key} のサーフィン (${surfs.length}件)`;
+  body.innerHTML = surfs.map(s=>{
+    const d = new Date(s.startTs);
+    return `<div style="padding:10px;margin-top:8px;background:#E0F7FA;border-radius:10px;font-size:13px">
+      <b>${d.toLocaleDateString('ja-JP')} ${fmtTime(s.startTs)}</b> · ${s.minutes}分
+      <span style="margin-left:6px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;background:${s.strength==='hard'?'#FFEBEE;color:#E53935':s.strength==='easy'?'#E8F5E9;color:#2E7D32':'#FFF3E0;color:#FB8C00'}">${STRENGTH_LABEL[s.strength]||s.strength}</span><br/>
+      消費 約 ${(s.burnKcal||0).toLocaleString()} kcal · 体重 ${(s.weightSnapshot||0).toFixed(1)}kg
+      ${s.place?'<br/>📍 '+escapeHtml(s.place):''}
+      ${s.memo?'<br/>📝 '+escapeHtml(s.memo):''}
+    </div>`;
+  }).join('');
+  dlg.showModal();
 }
 
 document.querySelectorAll('.seg button').forEach(b=>{
@@ -478,6 +692,7 @@ document.querySelectorAll('.seg button').forEach(b=>{
     document.querySelectorAll('.seg button').forEach(x=>x.classList.remove('active'));
     b.classList.add('active');
     renderChart();
+    attachSurfChartTap();
   });
 });
 
@@ -624,6 +839,186 @@ function renderSurfs(){
   }).join('') || '<div class="hint">今日のサーフィン記録はまだありません。</div>';
 }
 
+/* ============================================================
+   一日一清 (Good Acts)
+   - 1回 +200pt / 30,000pt 達成でご褒美ボタン
+   - 余ったポイントは持ち越し
+   - 項目リストは追加・修正・削除すべて可能
+   ============================================================ */
+
+function renderGoodActs(){
+  const acts = loadGoodActs();
+  const cur = calcGoodPoints();
+  const cycleProgress = ((cur % REWARD_COST) / REWARD_COST) * 100;
+
+  document.getElementById('gaCurrent').textContent = cur.toLocaleString();
+  document.getElementById('gaCycleTarget').textContent = REWARD_COST.toLocaleString();
+  document.getElementById('gaBar').style.width = Math.min(100, cycleProgress) + '%';
+  document.getElementById('gaTotalDone').textContent = `累計 ${acts.length}件 達成`;
+  const todayCnt = acts.filter(a=>isoDay(a.ts)===today()).length;
+  document.getElementById('gaTodayDone').textContent = `本日 ${todayCnt}件`;
+
+  // ご褒美ボタンの表示判定
+  const rewardBtn = document.getElementById('btnReward');
+  if(cur >= REWARD_COST){
+    rewardBtn.style.display = 'block';
+    const possible = Math.floor(cur / REWARD_COST);
+    rewardBtn.textContent = `🎁 ご褒美を使う（-30,000pt）${possible>1?' × '+possible+'回分':''}`;
+  }else{
+    rewardBtn.style.display = 'none';
+  }
+
+  // 本日の記録一覧
+  const list = document.getElementById('gaList');
+  const todays = acts.filter(a=>isoDay(a.ts)===today()).sort((a,b)=>a.ts-b.ts);
+  list.innerHTML = todays.map(a=>`
+    <div class="ga-row">
+      <div class="ico">🌟</div>
+      <div class="info"><b>${escapeHtml(a.activity)}</b>${a.memo?' · '+escapeHtml(a.memo):''}<br/><span style="font-size:11px;color:#8D6E63">${fmtTime(a.ts)}</span></div>
+      <div class="pts">+${(a.points||POINTS_PER_ACT).toLocaleString()}</div>
+    </div>
+  `).join('') || '<div class="hint" style="margin-top:8px">今日の一日一清はまだありません。一つ実行したら記録しましょう。</div>';
+}
+
+/* 記録ダイアログ */
+const dlgGoodAct = document.getElementById('dlgGoodAct');
+function refreshActivityDropdown(){
+  const sel = document.getElementById('gaActivity');
+  const list = loadGoodList();
+  sel.innerHTML = list.map(a=>`<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('');
+}
+document.getElementById('btnAddGoodAct').addEventListener('click', ()=>{
+  refreshActivityDropdown();
+  const now = new Date();
+  document.getElementById('gaDate').value = isoDay(now.getTime());
+  document.getElementById('gaTime').value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  document.getElementById('gaMemo').value = '';
+  dlgGoodAct.showModal();
+});
+document.getElementById('gaCancel').addEventListener('click', e=>{e.preventDefault();dlgGoodAct.close();});
+document.getElementById('gaSave').addEventListener('click', e=>{
+  e.preventDefault();
+  const date = document.getElementById('gaDate').value;
+  const time = document.getElementById('gaTime').value;
+  const activity = document.getElementById('gaActivity').value;
+  const memo = document.getElementById('gaMemo').value;
+  if(!date||!time||!activity){ alert('日付・時刻・内容を入力してください'); return; }
+  const ts = new Date(`${date}T${time}:00`).getTime();
+  const acts = loadGoodActs();
+  const rec = { ts, activity, points: POINTS_PER_ACT, memo };
+  acts.push(rec);
+  saveGoodActs(acts);
+  dlgGoodAct.close();
+  renderGoodActs();
+  toast(`🌟 +${POINTS_PER_ACT}pt 記録しました`, 'ok');
+  trySaveGoodActToDrive(rec, 'act');
+});
+
+/* 項目編集ダイアログ */
+const dlgEditActs = document.getElementById('dlgEditActs');
+function renderEditActsList(){
+  const list = loadGoodList();
+  const c = document.getElementById('editActsList');
+  c.innerHTML = list.map((a,i)=>`
+    <div class="ga-edit-row">
+      <input type="text" data-i="${i}" value="${escapeHtml(a)}" class="actEdit"/>
+      <button class="del" data-i="${i}">🗑</button>
+    </div>
+  `).join('');
+  // 編集
+  c.querySelectorAll('.actEdit').forEach(inp=>{
+    inp.addEventListener('change', e=>{
+      const i = Number(e.target.dataset.i);
+      const list = loadGoodList();
+      list[i] = e.target.value.trim() || list[i];
+      saveGoodList(list);
+    });
+  });
+  // 削除
+  c.querySelectorAll('button.del').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      e.preventDefault();
+      const i = Number(e.target.dataset.i);
+      const list = loadGoodList();
+      if(list.length<=1){ alert('項目は最低1個必要です'); return; }
+      if(!confirm(`「${list[i]}」を削除しますか？`)) return;
+      list.splice(i,1);
+      saveGoodList(list);
+      renderEditActsList();
+    });
+  });
+}
+document.getElementById('btnEditActs').addEventListener('click', ()=>{
+  renderEditActsList();
+  document.getElementById('newActInput').value='';
+  dlgEditActs.showModal();
+});
+document.getElementById('addActBtn').addEventListener('click', e=>{
+  e.preventDefault();
+  const v = document.getElementById('newActInput').value.trim();
+  if(!v) return;
+  const list = loadGoodList();
+  if(list.includes(v)){ alert('既に存在します'); return; }
+  list.push(v);
+  saveGoodList(list);
+  document.getElementById('newActInput').value='';
+  renderEditActsList();
+});
+document.getElementById('editActsClose').addEventListener('click', e=>{
+  e.preventDefault();
+  dlgEditActs.close();
+});
+
+/* ご褒美ダイアログ */
+const dlgReward = document.getElementById('dlgReward');
+document.getElementById('btnReward').addEventListener('click', ()=>{
+  document.getElementById('rwMemo').value='';
+  dlgReward.showModal();
+});
+document.getElementById('rwCancel').addEventListener('click', e=>{e.preventDefault();dlgReward.close();});
+document.getElementById('rwOK').addEventListener('click', e=>{
+  e.preventDefault();
+  const memo = document.getElementById('rwMemo').value.trim();
+  const rewards = loadGoodRewards();
+  const rec = { ts: Date.now(), points: -REWARD_COST, memo };
+  rewards.push(rec);
+  saveGoodRewards(rewards);
+  dlgReward.close();
+  renderGoodActs();
+  toast(`🎁 ご褒美 -${REWARD_COST.toLocaleString()}pt 使用！おめでとう！`, 'ok');
+  trySaveGoodActToDrive(rec, 'reward');
+});
+
+/* Drive 同期 */
+async function trySaveGoodActToDrive(rec, kind){
+  if(!driveEnabled()) return;
+  try{
+    const d = new Date(rec.ts);
+    let row;
+    if(kind==='act'){
+      row = [
+        isoDay(rec.ts),
+        `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`,
+        '実行',
+        rec.activity,
+        rec.points,
+        rec.memo||''
+      ];
+    }else{
+      row = [
+        isoDay(rec.ts),
+        `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`,
+        'ご褒美',
+        'ご褒美使用',
+        rec.points,
+        rec.memo||''
+      ];
+    }
+    await appendRowToExcel('goodact', row);
+    setDriveStatus('on','☁ 同期OK');
+  }catch(e){ console.warn(e); setDriveStatus('err','☁ '+e.message.slice(0,20)); toast('Drive同期失敗: '+e.message,'err'); }
+}
+
 /* -------- Claude API（食事画像解析） -------- */
 async function analyzeMealWithClaude(file){
   const cfg = loadCfg();
@@ -709,9 +1104,10 @@ let driveAccessToken = null;
 let driveTokenExpiresAt = 0;
 
 const EXCEL_DEF = {
-  weight: { name:'体重の記録.xlsx', headers:['年月日','時刻','体重(kg)','目標差(kg)','メモ'], sheet:'体重記録' },
-  meal:   { name:'食事の記録.xlsx', headers:['年月日','時刻','メニュー','カロリー(kcal)','画像ファイル名','AIコメント','種別'], sheet:'食事記録' },
-  surf:   { name:'サーフィン記録.xlsx', headers:['年月日','開始時刻','時間(分)','強度','推定消費(kcal)','場所','メモ','記録時体重(kg)'], sheet:'サーフィン記録' }
+  weight:  { name:'体重の記録.xlsx', headers:['年月日','時刻','体重(kg)','目標差(kg)','メモ'], sheet:'体重記録' },
+  meal:    { name:'食事の記録.xlsx', headers:['年月日','時刻','メニュー','カロリー(kcal)','画像ファイル名','AIコメント','種別'], sheet:'食事記録' },
+  surf:    { name:'サーフィン記録.xlsx', headers:['年月日','開始時刻','時間(分)','強度','推定消費(kcal)','場所','メモ','記録時体重(kg)'], sheet:'サーフィン記録' },
+  goodact: { name:'一日一清.xlsx', headers:['年月日','時刻','種別','内容','ポイント','メモ'], sheet:'一日一清' }
 };
 
 function loadDriveFiles(){ return JSON.parse(localStorage.getItem(STORE.driveFiles)||'{}'); }
@@ -967,11 +1363,12 @@ document.getElementById('driveStatus').addEventListener('click', async ()=>{
   }
   try{
     await getDriveToken({silent:false});
-    // 起動時に Excel ファイルを 3 種すべて準備
+    // 起動時に Excel ファイルを 4 種すべて準備
     setDriveStatus('connecting','☁ 準備中…');
     await ensureExcelFile('weight');
     await ensureExcelFile('meal');
     await ensureExcelFile('surf');
+    await ensureExcelFile('goodact');
     setDriveStatus('on','☁ 接続OK');
     toast('Driveに接続し、Excelファイルを準備しました','ok');
   }catch(e){
@@ -1031,8 +1428,10 @@ function refreshDriveStatusLabel(){
   }
   updateStatus();
   renderChart();
+  attachSurfChartTap();
   renderMeals();
   renderSurfs();
+  renderGoodActs();
   refreshDriveStatusLabel();
 })();
 </script>
