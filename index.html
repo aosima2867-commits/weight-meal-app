@@ -134,6 +134,51 @@
   .ga-edit-row{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #ECEFF1}
   .ga-edit-row input{flex:1;padding:6px 10px;border:1px solid #ECEFF1;border-radius:8px;font-size:13px}
   .ga-edit-row button.del{background:#FFEBEE;color:#E53935;border:none;padding:6px 10px;border-radius:8px;font-weight:600;font-size:11px;cursor:pointer}
+  /* ティア・マイルストーン */
+  .tier-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+  .tier-row{display:flex;gap:10px;align-items:center;padding:10px;border-radius:10px;font-family:inherit;border:none;cursor:pointer;width:100%;text-align:left;transition:transform .12s}
+  .tier-row.locked{background:#ECEFF1;color:var(--muted);cursor:not-allowed}
+  .tier-row.preview{background:linear-gradient(135deg,#FFF8E1,#FFECB3);color:#5D4037}
+  .tier-row.preview:active{transform:scale(.97)}
+  .tier-row.consume{background:linear-gradient(135deg,#FFD54F,#FFA726);color:#5D4037;font-weight:700;animation:rewardPulse 1.5s infinite}
+  .tier-row.consume:active{transform:scale(.97)}
+  .tier-row .tier-ico{font-size:22px;width:36px;text-align:center}
+  .tier-row .tier-info{flex:1;font-size:13px}
+  .tier-row .tier-info b{font-size:14px}
+  .tier-row .tier-arrow{font-size:18px;opacity:.7}
+  /* 画像モーダル */
+  dialog.imgmodal{padding:0;border-radius:18px;max-width:92vw;width:92vw;max-height:92vh;background:#000;border:none;overflow:hidden}
+  dialog.imgmodal::backdrop{background:rgba(0,0,0,.85)}
+  .imgmodal-head{position:absolute;top:8px;right:8px;z-index:2}
+  .imgmodal-close{background:rgba(0,0,0,.6);color:#fff;border:none;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;font-weight:700}
+  .imgmodal-body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh}
+  .imgmodal-body img{max-width:92vw;max-height:75vh;display:block;object-fit:contain}
+  .imgmodal-caption{color:#fff;text-align:center;padding:14px 20px;font-size:14px;line-height:1.6;background:rgba(0,0,0,.5)}
+  .imgmodal-caption b{font-size:16px;color:#FFD54F}
+  .imgmodal-placeholder{padding:40px;color:#fff;text-align:center;font-size:14px;line-height:1.7}
+  .imgmodal-placeholder .ph-emoji{font-size:80px;margin-bottom:12px}
+  /* 音声ボタン */
+  .speak-btn{background:transparent;border:1px solid #C8E6C9;color:var(--green-dark);padding:6px 12px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+  .speak-btn:active{background:#E8F5E9}
+  .speak-btn.speaking{background:var(--green);color:#fff;border-color:var(--green)}
+  /* メインキャラクター */
+  .maincharacter-card{background:linear-gradient(135deg,#FFF3E0 0%,#FCE4EC 100%)}
+  .mc-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px}
+  .mc-thumb{width:100%;aspect-ratio:1/1.2;max-height:340px;border-radius:14px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.06);position:relative}
+  .mc-thumb img,.mc-thumb video{width:100%;height:100%;object-fit:cover;display:block}
+  .mc-thumb .mc-emoji{font-size:80px;line-height:1}
+  .mc-thumb .mc-loading{font-size:11px;color:var(--muted);margin-top:8px}
+  .mc-thumb .mc-overlay{position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;display:flex;align-items:center;gap:4px}
+  button.mc-fullscreen-btn{background:linear-gradient(135deg,#FB8C00,#F06292);color:#fff;border:none;padding:14px 18px;border-radius:14px;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 3px 0 #B71C1C;width:100%;font-family:inherit;letter-spacing:.04em}
+  button.mc-fullscreen-btn:active{transform:translateY(1px);box-shadow:0 1px 0 #B71C1C}
+  /* メインキャラ フルスクリーン */
+  dialog.mc-modal{padding:0;border:none;background:#000;width:100vw;height:100vh;max-width:100vw;max-height:100vh;margin:0}
+  dialog.mc-modal::backdrop{background:#000}
+  .mc-modal-body{width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;position:relative}
+  .mc-modal-body img,.mc-modal-body video{max-width:100vw;max-height:100vh;width:100%;height:100%;object-fit:contain;background:#000}
+  .mc-modal-close{position:absolute;top:max(12px,env(safe-area-inset-top));right:12px;width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;border:none;font-size:22px;cursor:pointer;font-weight:700;z-index:5;display:flex;align-items:center;justify-content:center}
+  .mc-modal-empty{color:#fff;text-align:center;padding:40px}
+  .mc-modal-empty .mc-empty-emoji{font-size:90px;margin-bottom:18px}
 </style>
 </head>
 <body>
@@ -249,10 +294,12 @@
   </div>
 
   <button class="goodact" id="btnAddGoodAct">＋ 一日一清を記録（+200pt）</button>
-  <button class="reward" id="btnReward" style="display:none">🎁 ご褒美を使う（-30,000pt）</button>
+
+  <!-- 3ティアご褒美マイルストーン -->
+  <div class="tier-list" id="tierList"></div>
 
   <div id="gaList"></div>
-  <div class="hint">良い習慣を続けて、自分にご褒美を許可しましょう。30,000pt 達成時に「ご褒美ボタン」が出現します。</div>
+  <div class="hint">10K/20K はチラ見せ通過点（pt消費なし）、30K のビキニご褒美で 30,000pt 消費 → サイクル再スタート（余りpt持越）</div>
 </section>
 
 <!-- サーフィン記録 -->
@@ -265,9 +312,12 @@
 
 <!-- AIアドバイス（将来キャラクター化を想定） -->
 <section class="card" aria-label="AI健康アドバイス">
-  <div style="display:flex;justify-content:space-between;align-items:center">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
     <h2 style="margin:0">🤖 AI 健康アドバイス</h2>
-    <button class="settings-btn" id="btnAdvice">生成</button>
+    <div style="display:flex;gap:6px">
+      <button class="speak-btn" id="btnSpeak" title="音声で話してもらう">🔊 話す</button>
+      <button class="settings-btn" id="btnAdvice">生成</button>
+    </div>
   </div>
   <div class="character-slot">
     <div class="avatar" id="characterAvatar" title="将来 NANOBANANA で生成したオリジナルキャラクターと差替え予定">🧑‍⚕️</div>
@@ -275,6 +325,19 @@
       <div class="ai-advice" id="aiAdvice">体重・食事・サーフィンの記録が集まると、Claudeが分析して具体的なアドバイスを表示します。</div>
     </div>
   </div>
+</section>
+
+<!-- メインキャラクター（アプリ最下部） -->
+<section class="card maincharacter-card" aria-label="メインキャラクター">
+  <h2>✨ メインキャラクター</h2>
+  <div class="mc-wrap">
+    <div class="mc-thumb" id="mcThumb">
+      <span class="mc-emoji">🏄‍♀️</span>
+      <span class="mc-loading">画像を読み込み中…</span>
+    </div>
+    <button class="mc-fullscreen-btn" id="btnMcFullscreen">⛶ フルスクリーンで見る</button>
+  </div>
+  <div class="hint">Drive 「健康管理」フォルダに <code>character_main.mp4</code> または <code>character_main.png</code> を保存すると表示されます。動画優先。</div>
 </section>
 
 <footer>
@@ -379,9 +442,9 @@
   </div>
 </dialog>
 
-<!-- ご褒美使用確認ダイアログ -->
+<!-- ご褒美消費（30K）確認ダイアログ -->
 <dialog id="dlgReward">
-  <h3>🎁 ご褒美を使いますか？</h3>
+  <h3>🎁 ビキニご褒美を獲得しますか？</h3>
   <div style="font-size:13px;color:var(--text);margin-top:8px;line-height:1.6">
     30,000 pt を消費して、自分にご褒美を許可します。<br/>
     余ったポイントは次のサイクルに引き継がれます。
@@ -391,8 +454,23 @@
   </label>
   <div class="actions">
     <button class="cancel" id="rwCancel">キャンセル</button>
-    <button class="ok" id="rwOK" style="background:linear-gradient(135deg,#FFD54F,#FFA726);color:#5D4037">使う</button>
+    <button class="ok" id="rwOK" style="background:linear-gradient(135deg,#FFD54F,#FFA726);color:#5D4037">使う(-30,000pt)</button>
   </div>
+</dialog>
+
+<!-- メインキャラクター フルスクリーンモーダル -->
+<dialog id="dlgMainChar" class="mc-modal">
+  <div class="mc-modal-body" id="mcModalBody"></div>
+  <button class="mc-modal-close" id="mcModalClose">✕</button>
+</dialog>
+
+<!-- 画像モーダル（ティア画像表示用） -->
+<dialog id="dlgImage" class="imgmodal">
+  <div class="imgmodal-head">
+    <button class="imgmodal-close" id="imCloseBtn">✕</button>
+  </div>
+  <div class="imgmodal-body" id="imBody"></div>
+  <div class="imgmodal-caption" id="imCaption"></div>
 </dialog>
 
 <!-- サーフィン記録ダイアログ -->
@@ -438,6 +516,12 @@ const STORE = {
 
 const POINTS_PER_ACT = 200;
 const REWARD_COST = 30000;
+
+const MILESTONES = [
+  { tier:1, name:'レオタード',     threshold:10000, fileName:'character_reward_leotard.png',   consume:false, emoji:'🥉' },
+  { tier:2, name:'サーフビキニ',   threshold:20000, fileName:'character_reward_surfbikini.png', consume:false, emoji:'🥈' },
+  { tier:3, name:'ビキニご褒美',   threshold:30000, fileName:'character_reward_bikini.png',     consume:true,  cost:30000, emoji:'🥇' }
+];
 
 const DEFAULT_GOOD_ACTS = [
   '風呂掃除','床掃除','ごみ・プラゴミ出し','洗濯物干し畳み',
@@ -909,7 +993,7 @@ function renderSurfs(){
 function renderGoodActs(){
   const acts = loadGoodActs();
   const cur = calcGoodPoints();
-  const cycleProgress = ((cur % REWARD_COST) / REWARD_COST) * 100;
+  const cycleProgress = (Math.min(cur, REWARD_COST) / REWARD_COST) * 100;
 
   document.getElementById('gaCurrent').textContent = cur.toLocaleString();
   document.getElementById('gaCycleTarget').textContent = REWARD_COST.toLocaleString();
@@ -918,15 +1002,48 @@ function renderGoodActs(){
   const todayCnt = acts.filter(a=>isoDay(a.ts)===today()).length;
   document.getElementById('gaTodayDone').textContent = `本日 ${todayCnt}件`;
 
-  // ご褒美ボタンの表示判定
-  const rewardBtn = document.getElementById('btnReward');
-  if(cur >= REWARD_COST){
-    rewardBtn.style.display = 'block';
-    const possible = Math.floor(cur / REWARD_COST);
-    rewardBtn.textContent = `🎁 ご褒美を使う（-30,000pt）${possible>1?' × '+possible+'回分':''}`;
-  }else{
-    rewardBtn.style.display = 'none';
-  }
+  // 3ティア マイルストーン
+  const tierList = document.getElementById('tierList');
+  tierList.innerHTML = MILESTONES.map(m=>{
+    const reached = cur >= m.threshold;
+    let cls, lbl, arrow;
+    if(!reached){
+      cls = 'locked';
+      const need = (m.threshold - cur).toLocaleString();
+      lbl = `🔒 <b>${m.emoji} ${m.name}</b><br/><span style="font-size:11px">あと ${need} pt</span>`;
+      arrow = '';
+    }else if(m.consume){
+      cls = 'consume';
+      lbl = `🎁 <b>${m.emoji} ${m.name}</b><br/><span style="font-size:11px">タップで画像表示 + ${m.cost.toLocaleString()}pt 消費</span>`;
+      arrow = '▶';
+    }else{
+      cls = 'preview';
+      lbl = `✨ <b>${m.emoji} ${m.name}</b> 解放中<br/><span style="font-size:11px">タップで画像を見る（消費なし）</span>`;
+      arrow = '👁';
+    }
+    return `<button class="tier-row ${cls}" data-tier="${m.tier}" ${!reached?'disabled':''}>
+      <div class="tier-ico">${m.emoji}</div>
+      <div class="tier-info">${lbl}</div>
+      <div class="tier-arrow">${arrow}</div>
+    </button>`;
+  }).join('');
+
+  // クリックハンドラを再アタッチ
+  tierList.querySelectorAll('button.tier-row[data-tier]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const t = Number(btn.dataset.tier);
+      const m = MILESTONES.find(x=>x.tier===t);
+      if(!m || cur < m.threshold) return;
+      if(m.consume){
+        // 30Kご褒美：消費前に確認ダイアログ
+        document.getElementById('rwMemo').value='';
+        document.getElementById('dlgReward').showModal();
+      }else{
+        // 10K/20K：画像のみ表示（消費なし）
+        showCharacterImage(m);
+      }
+    });
+  });
 
   // 本日の記録一覧
   const list = document.getElementById('gaList');
@@ -939,6 +1056,128 @@ function renderGoodActs(){
     </div>
   `).join('') || '<div class="hint" style="margin-top:8px">今日の一日一清はまだありません。一つ実行したら記録しましょう。</div>';
 }
+
+/* キャラクター画像表示モーダル */
+const characterImgCache = {}; // {fileName: blobUrl}
+async function showCharacterImage(milestone){
+  const dlg = document.getElementById('dlgImage');
+  const body = document.getElementById('imBody');
+  const cap = document.getElementById('imCaption');
+  cap.innerHTML = `<b>${milestone.emoji} ${milestone.name}</b><br/>${milestone.consume?'30,000pt 消費しました 🎉':'チラ見せ通過点 ✨'}`;
+  body.innerHTML = `<div style="color:#fff;padding:40px">読み込み中…</div>`;
+  dlg.showModal();
+
+  try{
+    let url = characterImgCache[milestone.fileName];
+    if(!url){
+      url = await loadDriveImage(milestone.fileName);
+      if(url) characterImgCache[milestone.fileName] = url;
+    }
+    if(url){
+      body.innerHTML = `<img src="${url}" alt="${milestone.name}"/>`;
+    }else{
+      body.innerHTML = `<div class="imgmodal-placeholder">
+        <div class="ph-emoji">${milestone.emoji}</div>
+        <b>${milestone.name}</b><br/>
+        画像がまだ Drive に保存されていません。<br/><br/>
+        <span style="font-size:12px;color:#FFD54F">「健康管理」フォルダに<br/><code>${milestone.fileName}</code><br/>をアップロードしてください</span>
+      </div>`;
+    }
+  }catch(e){
+    body.innerHTML = `<div class="imgmodal-placeholder"><div class="ph-emoji">⚠️</div>画像読込失敗: ${e.message}</div>`;
+  }
+}
+
+/* Drive から画像を取得して blob URL を返す */
+async function loadDriveImage(fileName){
+  if(!driveEnabled()) return null;
+  const cfg = loadCfg();
+  const id = await findFileInFolder(fileName, cfg.folderHealth);
+  if(!id) return null;
+  await verifyParent(id, cfg.folderHealth); // セキュリティ照合
+  const r = await driveFetch(`/files/${id}?alt=media`);
+  const blob = await r.blob();
+  return URL.createObjectURL(blob);
+}
+
+document.getElementById('imCloseBtn').addEventListener('click', ()=>{
+  document.getElementById('dlgImage').close();
+});
+
+/* ============================================================
+   メインキャラクター（アプリ末尾セクション）
+   - Drive「健康管理」フォルダから character_main.mp4 / .png を取得
+   - サムネ表示 + フルスクリーンモーダルで再生/表示
+   - 動画優先、なければ画像
+   ============================================================ */
+const MC_VIDEO_NAME = 'character_main.mp4';
+const MC_IMAGE_NAME = 'character_main.png';
+let mcCachedUrl = null;
+let mcCachedKind = null; // 'video' | 'image' | null
+
+async function loadMainCharacter(forceRefresh){
+  if(!driveEnabled()) return null;
+  if(!forceRefresh && mcCachedUrl) return { url: mcCachedUrl, kind: mcCachedKind };
+  try{
+    // 動画を優先で検索
+    let url = await loadDriveImage(MC_VIDEO_NAME);
+    if(url){ mcCachedUrl = url; mcCachedKind = 'video'; return { url, kind:'video' }; }
+    url = await loadDriveImage(MC_IMAGE_NAME);
+    if(url){ mcCachedUrl = url; mcCachedKind = 'image'; return { url, kind:'image' }; }
+  }catch(e){ console.warn('mainCharacter load failed', e.message); }
+  return null;
+}
+
+async function refreshMainCharacterThumb(){
+  const t = document.getElementById('mcThumb');
+  if(!driveEnabled()){
+    t.innerHTML = `<span class="mc-emoji">🏄‍♀️</span><span class="mc-loading">Drive 未接続（⚙設定で接続後に表示）</span>`;
+    return;
+  }
+  t.innerHTML = `<span class="mc-emoji">🏄‍♀️</span><span class="mc-loading">読み込み中…</span>`;
+  const r = await loadMainCharacter();
+  if(!r){
+    t.innerHTML = `<span class="mc-emoji">🏄‍♀️</span><span class="mc-loading">Drive「健康管理」に <code>character_main.mp4</code> または <code>.png</code> を保存してください</span>`;
+    return;
+  }
+  if(r.kind==='video'){
+    t.innerHTML = `<video src="${r.url}" muted playsinline preload="metadata"></video><span class="mc-overlay">▶ 動画</span>`;
+  }else{
+    t.innerHTML = `<img src="${r.url}" alt="メインキャラ"/><span class="mc-overlay">📷 画像</span>`;
+  }
+}
+
+document.getElementById('mcThumb').addEventListener('click', ()=> openMainCharacterFullscreen());
+document.getElementById('btnMcFullscreen').addEventListener('click', ()=> openMainCharacterFullscreen());
+
+async function openMainCharacterFullscreen(){
+  const dlg = document.getElementById('dlgMainChar');
+  const body = document.getElementById('mcModalBody');
+  body.innerHTML = `<div class="mc-modal-empty"><div class="mc-empty-emoji">⏳</div>読み込み中…</div>`;
+  dlg.showModal();
+  if(!driveEnabled()){
+    body.innerHTML = `<div class="mc-modal-empty"><div class="mc-empty-emoji">⚙</div>Drive と接続してください<br/><span style="font-size:12px;color:#FFD54F">右上の ⚙ 設定 → 保存 → ☁ をタップ</span></div>`;
+    return;
+  }
+  const r = await loadMainCharacter();
+  if(!r){
+    body.innerHTML = `<div class="mc-modal-empty"><div class="mc-empty-emoji">🏄‍♀️</div>メインキャラ未配置<br/><br/><span style="font-size:13px;color:#FFD54F">Drive「健康管理」フォルダに以下を保存:<br/><code>character_main.mp4</code>（動画 / 優先）<br/>または<br/><code>character_main.png</code>（画像）</span></div>`;
+    return;
+  }
+  if(r.kind==='video'){
+    body.innerHTML = `<video src="${r.url}" controls autoplay loop playsinline></video>`;
+  }else{
+    body.innerHTML = `<img src="${r.url}" alt="メインキャラ"/>`;
+  }
+}
+
+document.getElementById('mcModalClose').addEventListener('click', ()=>{
+  const dlg = document.getElementById('dlgMainChar');
+  // 動画再生中なら停止
+  const v = dlg.querySelector('video');
+  if(v){ try{ v.pause(); }catch(_){} }
+  dlg.close();
+});
 
 /* 記録ダイアログ */
 const dlgGoodAct = document.getElementById('dlgGoodAct');
@@ -1029,12 +1268,8 @@ document.getElementById('editActsClose').addEventListener('click', e=>{
   dlgEditActs.close();
 });
 
-/* ご褒美ダイアログ */
+/* ご褒美消費ダイアログ（30K専用） */
 const dlgReward = document.getElementById('dlgReward');
-document.getElementById('btnReward').addEventListener('click', ()=>{
-  document.getElementById('rwMemo').value='';
-  dlgReward.showModal();
-});
 document.getElementById('rwCancel').addEventListener('click', e=>{e.preventDefault();dlgReward.close();});
 document.getElementById('rwOK').addEventListener('click', e=>{
   e.preventDefault();
@@ -1047,6 +1282,8 @@ document.getElementById('rwOK').addEventListener('click', e=>{
   renderGoodActs();
   toast(`🎁 ご褒美 -${REWARD_COST.toLocaleString()}pt 使用！おめでとう！`, 'ok');
   trySaveGoodActToDrive(rec, 'reward');
+  // 消費後にビキニ画像を表示（達成のご褒美演出）
+  setTimeout(()=> showCharacterImage(MILESTONES.find(m=>m.consume)), 300);
 });
 
 /* Drive 同期 */
@@ -1118,6 +1355,68 @@ async function analyzeMealWithClaude(file){
 /* -------- AI総合アドバイス（サーフィン考慮、キャラクター発話を想定した構造） --------
    出力フォーマットを構造化しておくと、後でキャラ立ち絵+音声に流し込み易い
 */
+/* ============================================================
+   音声合成（Web Speech API）— 女性・優しい声でアドバイス読み上げ
+   - APIキー不要・追加通信なし（ブラウザ内蔵機能）
+   - iOS Safari は Kyoko (女性) が標準
+   ============================================================ */
+let _voicesLoaded = false;
+function ensureVoicesLoaded(){
+  return new Promise(resolve=>{
+    if(_voicesLoaded || !('speechSynthesis' in window)){ resolve(); return; }
+    const v = speechSynthesis.getVoices();
+    if(v.length){ _voicesLoaded = true; resolve(); return; }
+    speechSynthesis.onvoiceschanged = ()=>{ _voicesLoaded = true; resolve(); };
+    setTimeout(()=>{ _voicesLoaded = true; resolve(); }, 1500); // タイムアウトでも進行
+  });
+}
+
+function pickJapaneseFemaleVoice(){
+  if(!('speechSynthesis' in window)) return null;
+  const voices = speechSynthesis.getVoices();
+  // 優先順: 既知の日本語女性音声名
+  const preferred = ['Kyoko','O-ren','Mizuki','Haruka','Ayumi','Sayaka','Nanami','Google 日本語'];
+  for(const name of preferred){
+    const v = voices.find(v=>v.lang.toLowerCase().startsWith('ja') && v.name.includes(name));
+    if(v) return v;
+  }
+  // フォールバック: 日本語の任意音声
+  const ja = voices.find(v=>v.lang.toLowerCase().startsWith('ja'));
+  return ja || null;
+}
+
+function speakAdvice(text){
+  if(!('speechSynthesis' in window)){
+    toast('この端末は音声合成に未対応です','err'); return;
+  }
+  if(!text || !text.trim()){ return; }
+  speechSynthesis.cancel(); // 進行中があれば停止
+  const u = new SpeechSynthesisUtterance(text);
+  const v = pickJapaneseFemaleVoice();
+  if(v) u.voice = v;
+  u.lang = 'ja-JP';
+  u.rate = 0.95;  // ゆっくり目
+  u.pitch = 1.15; // やや高め（女性らしさ）
+  u.volume = 1.0;
+  const btn = document.getElementById('btnSpeak');
+  u.onstart = ()=> btn.classList.add('speaking');
+  u.onend   = ()=> btn.classList.remove('speaking');
+  u.onerror = ()=> btn.classList.remove('speaking');
+  speechSynthesis.speak(u);
+}
+
+document.getElementById('btnSpeak').addEventListener('click', async ()=>{
+  // 再タップで停止
+  if(speechSynthesis.speaking){ speechSynthesis.cancel(); document.getElementById('btnSpeak').classList.remove('speaking'); return; }
+  await ensureVoicesLoaded();
+  const text = document.getElementById('aiAdvice').textContent.trim();
+  if(!text || text.includes('体重・食事')) {
+    speakAdvice('まずアドバイス生成ボタンを押してください。');
+    return;
+  }
+  speakAdvice(text);
+});
+
 document.getElementById('btnAdvice').addEventListener('click', async ()=>{
   const el = document.getElementById('aiAdvice');
   el.textContent = '生成中...';
@@ -1145,7 +1444,11 @@ document.getElementById('btnAdvice').addEventListener('click', async ()=>{
       body: JSON.stringify({model:"claude-opus-4-6",max_tokens:600,messages:[{role:"user",content:prompt}]})
     });
     const j = await res.json();
-    el.textContent = j.content?.[0]?.text || '結果が取得できませんでした。';
+    const txt = j.content?.[0]?.text || '結果が取得できませんでした。';
+    el.textContent = txt;
+    // 生成後、自動で女性の声で読み上げ
+    await ensureVoicesLoaded();
+    speakAdvice(txt);
   }catch(e){ el.textContent = 'アドバイスの生成に失敗しました: '+e.message; }
 });
 
@@ -1431,6 +1734,7 @@ document.getElementById('driveStatus').addEventListener('click', async ()=>{
     await ensureExcelFile('goodact');
     setDriveStatus('on','☁ 接続OK');
     toast('Driveに接続し、Excelファイルを準備しました','ok');
+    refreshMainCharacterThumb(); // メインキャラ画像を読込
   }catch(e){
     setDriveStatus('err','☁ 失敗');
     toast('接続失敗: '+e.message,'err');
@@ -1493,6 +1797,12 @@ function refreshDriveStatusLabel(){
   renderSurfs();
   renderGoodActs();
   refreshDriveStatusLabel();
+  refreshMainCharacterThumb();
+  // 音声リスト事前ロード（初回タップ時の遅延を回避）
+  if('speechSynthesis' in window){
+    speechSynthesis.getVoices();
+    speechSynthesis.onvoiceschanged = ()=>{ _voicesLoaded = true; };
+  }
 })();
 </script>
 </body>
