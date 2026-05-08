@@ -179,6 +179,20 @@
   .mc-modal-close{position:absolute;top:max(12px,env(safe-area-inset-top));right:12px;width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;border:none;font-size:22px;cursor:pointer;font-weight:700;z-index:5;display:flex;align-items:center;justify-content:center}
   .mc-modal-empty{color:#fff;text-align:center;padding:40px}
   .mc-modal-empty .mc-empty-emoji{font-size:90px;margin-bottom:18px}
+  /* キャラ画像アップロードUI */
+  .char-upload-section{margin-top:14px;padding:12px;background:rgba(255,255,255,.6);border-radius:12px}
+  .char-upload-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px}
+  .char-upload-hint{font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.5}
+  .char-upload-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(0,0,0,.06);font-size:12px}
+  .char-upload-row:last-child{border-bottom:none}
+  .char-upload-label{flex:1;font-weight:600;color:var(--text)}
+  .char-upload-label small{color:var(--muted);font-weight:400;font-size:10px}
+  .char-upload-status{font-size:11px;color:var(--muted);font-weight:600;min-width:48px;text-align:center}
+  .char-upload-status.ok{color:var(--green-dark)}
+  .char-upload-status.up{color:var(--amber);animation:rewardPulse 1s infinite}
+  .char-upload-btn{background:var(--green);color:#fff;border:none;padding:6px 12px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+  .char-upload-btn:active{transform:translateY(1px)}
+  .char-upload-btn:disabled{background:#BDBDBD;cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -337,7 +351,42 @@
     </div>
     <button class="mc-fullscreen-btn" id="btnMcFullscreen">⛶ フルスクリーンで見る</button>
   </div>
-  <div class="hint">Drive 「健康管理」フォルダに <code>character_main.mp4</code> または <code>character_main.png</code> を保存すると表示されます。動画優先。</div>
+
+  <!-- アップロード管理 -->
+  <div class="char-upload-section">
+    <div class="char-upload-title">📤 画像/動画を設定</div>
+    <div class="char-upload-hint">アプリ経由でアップロード（Drive手動アップだとアプリから見えません）</div>
+
+    <div class="char-upload-row">
+      <span class="char-upload-label">✨ メインキャラ <small>(mp4/png)</small></span>
+      <span class="char-upload-status" id="csMain">—</span>
+      <input type="file" id="ufMain" accept="image/png,image/jpeg,video/mp4,video/quicktime" style="display:none"/>
+      <button class="char-upload-btn" data-target="main">📤 選択</button>
+    </div>
+
+    <div class="char-upload-row">
+      <span class="char-upload-label">🥉 レオタード <small>(png)</small></span>
+      <span class="char-upload-status" id="csLeotard">—</span>
+      <input type="file" id="ufLeotard" accept="image/png,image/jpeg" style="display:none"/>
+      <button class="char-upload-btn" data-target="leotard">📤 選択</button>
+    </div>
+
+    <div class="char-upload-row">
+      <span class="char-upload-label">🥈 サーフビキニ <small>(png)</small></span>
+      <span class="char-upload-status" id="csSurfbikini">—</span>
+      <input type="file" id="ufSurfbikini" accept="image/png,image/jpeg" style="display:none"/>
+      <button class="char-upload-btn" data-target="surfbikini">📤 選択</button>
+    </div>
+
+    <div class="char-upload-row">
+      <span class="char-upload-label">🥇 ビキニ <small>(png)</small></span>
+      <span class="char-upload-status" id="csBikini">—</span>
+      <input type="file" id="ufBikini" accept="image/png,image/jpeg" style="display:none"/>
+      <button class="char-upload-btn" data-target="bikini">📤 選択</button>
+    </div>
+  </div>
+
+  <div class="hint">画像/動画を更新したら、最大 1 分程度キャッシュで古いものが見えることがあります。☁ をタップすると即時反映。</div>
 </section>
 
 <footer>
@@ -1179,6 +1228,129 @@ document.getElementById('mcModalClose').addEventListener('click', ()=>{
   dlg.close();
 });
 
+/* ============================================================
+   キャラクター画像/動画 アップロード機能
+   - drive.file スコープ問題を回避するため、アプリ経由でアップ
+   - メインキャラ + 3ティア（レオタード・サーフビキニ・ビキニ）
+   ============================================================ */
+const CHAR_TARGETS = {
+  main: {
+    statusId: 'csMain',
+    inputId: 'ufMain',
+    getName(file){
+      const ext = (file.name.split('.').pop()||'').toLowerCase();
+      if(ext==='mp4' || ext==='mov' || file.type.startsWith('video/')) return 'character_main.mp4';
+      return 'character_main.png';
+    }
+  },
+  leotard:    { statusId:'csLeotard',    inputId:'ufLeotard',    getName:()=>'character_reward_leotard.png' },
+  surfbikini: { statusId:'csSurfbikini', inputId:'ufSurfbikini', getName:()=>'character_reward_surfbikini.png' },
+  bikini:     { statusId:'csBikini',     inputId:'ufBikini',     getName:()=>'character_reward_bikini.png' }
+};
+
+async function uploadCharacterFile(file, fileName){
+  const cfg = loadCfg();
+  if(!cfg.folderHealth) throw new Error('健康管理フォルダID未設定');
+  if(!driveEnabled()) throw new Error('Drive未接続');
+  await getDriveToken({silent:true});
+
+  // 既存ファイルがあれば削除（上書き相当）
+  try{
+    const existingId = await findFileInFolder(fileName, cfg.folderHealth);
+    if(existingId){
+      await verifyParent(existingId, cfg.folderHealth);
+      await driveFetch(`/files/${existingId}`, { method:'DELETE' });
+    }
+  }catch(e){ console.warn('既存ファイル削除スキップ:', e.message); }
+
+  // mp4 がある時は png のフォールバックに上書き優先順位を変えるため、
+  // mp4 をアップする時は念のため既存 png を残す（共存OK、mp4が優先）。
+  // png をアップする時、mp4 は残す（既存運用維持）。
+
+  const buf = await file.arrayBuffer();
+  const mimeType = file.type || (fileName.endsWith('.mp4')?'video/mp4':'image/png');
+  const meta = { name: fileName, parents:[cfg.folderHealth] };
+  const j = await multipartUpload({
+    metadata: meta, mimeType, dataBuffer: buf
+  });
+  // セキュリティ：親フォルダ照合
+  if(!j.parents?.includes(cfg.folderHealth)){
+    try{ await driveFetch(`/files/${j.id}`, { method:'DELETE' }); }catch(_){}
+    throw new Error('安全停止: 親フォルダ不一致');
+  }
+  return j;
+}
+
+function setCharStatus(statusId, state, label){
+  const el = document.getElementById(statusId);
+  if(!el) return;
+  el.className = 'char-upload-status' + (state?' '+state:'');
+  el.textContent = label || '—';
+}
+
+async function refreshCharStatuses(){
+  // 既存ファイルの存在確認を更新表示
+  if(!driveEnabled()){
+    Object.values(CHAR_TARGETS).forEach(t=> setCharStatus(t.statusId,'','—'));
+    return;
+  }
+  const cfg = loadCfg();
+  const checks = [
+    {id:'csMain', names:['character_main.mp4','character_main.png']},
+    {id:'csLeotard', names:['character_reward_leotard.png']},
+    {id:'csSurfbikini', names:['character_reward_surfbikini.png']},
+    {id:'csBikini', names:['character_reward_bikini.png']}
+  ];
+  for(const c of checks){
+    let found = false;
+    for(const n of c.names){
+      try{
+        const id = await findFileInFolder(n, cfg.folderHealth);
+        if(id){ found = true; break; }
+      }catch(_){}
+    }
+    setCharStatus(c.id, found?'ok':'', found?'✓ 設定済':'未設定');
+  }
+}
+
+// 各ボタンと file input の連携
+document.querySelectorAll('button.char-upload-btn').forEach(btn=>{
+  const target = btn.dataset.target;
+  const cfg = CHAR_TARGETS[target];
+  if(!cfg) return;
+  btn.addEventListener('click', ()=>{
+    if(!driveEnabled()){ toast('Driveに接続してください（⚙設定 → ☁タップ）','err'); return; }
+    document.getElementById(cfg.inputId).click();
+  });
+  document.getElementById(cfg.inputId).addEventListener('change', async (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    e.target.value = ''; // 同じファイル再選択を可能にするため
+    const fileName = cfg.getName(file);
+    setCharStatus(cfg.statusId,'up','アップ中…');
+    btn.disabled = true;
+    try{
+      await uploadCharacterFile(file, fileName);
+      setCharStatus(cfg.statusId,'ok','✓ 設定済');
+      toast(`✅ ${fileName} をアップしました`,'ok');
+      // キャッシュをクリアして再描画
+      Object.keys(characterImgCache).forEach(k=>{ try{ URL.revokeObjectURL(characterImgCache[k]); }catch(_){} delete characterImgCache[k]; });
+      mcCachedUrl = null; mcCachedKind = null;
+      if(target==='main'){
+        await refreshMainCharacterThumb();
+      }else{
+        renderGoodActs(); // ティア表示も更新
+      }
+    }catch(err){
+      console.warn(err);
+      setCharStatus(cfg.statusId,'','失敗');
+      toast('アップロード失敗: '+err.message,'err');
+    }finally{
+      btn.disabled = false;
+    }
+  });
+});
+
 /* 記録ダイアログ */
 const dlgGoodAct = document.getElementById('dlgGoodAct');
 function refreshActivityDropdown(){
@@ -1735,6 +1907,7 @@ document.getElementById('driveStatus').addEventListener('click', async ()=>{
     setDriveStatus('on','☁ 接続OK');
     toast('Driveに接続し、Excelファイルを準備しました','ok');
     refreshMainCharacterThumb(); // メインキャラ画像を読込
+    refreshCharStatuses();
   }catch(e){
     setDriveStatus('err','☁ 失敗');
     toast('接続失敗: '+e.message,'err');
@@ -1798,6 +1971,7 @@ function refreshDriveStatusLabel(){
   renderGoodActs();
   refreshDriveStatusLabel();
   refreshMainCharacterThumb();
+  refreshCharStatuses();
   // 音声リスト事前ロード（初回タップ時の遅延を回避）
   if('speechSynthesis' in window){
     speechSynthesis.getVoices();
