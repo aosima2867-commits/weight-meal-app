@@ -365,21 +365,21 @@
     </div>
 
     <div class="char-upload-row">
-      <span class="char-upload-label">🥉 レオタード <small>(png)</small></span>
+      <span class="char-upload-label">🥉 10,000pt迄 <small>(png)</small></span>
       <span class="char-upload-status" id="csLeotard">—</span>
       <input type="file" id="ufLeotard" accept="image/png,image/jpeg" style="display:none"/>
       <button class="char-upload-btn" data-target="leotard">📤 選択</button>
     </div>
 
     <div class="char-upload-row">
-      <span class="char-upload-label">🥈 サーフビキニ <small>(png)</small></span>
+      <span class="char-upload-label">🥈 20,000pt迄 <small>(png)</small></span>
       <span class="char-upload-status" id="csSurfbikini">—</span>
       <input type="file" id="ufSurfbikini" accept="image/png,image/jpeg" style="display:none"/>
       <button class="char-upload-btn" data-target="surfbikini">📤 選択</button>
     </div>
 
     <div class="char-upload-row">
-      <span class="char-upload-label">🥇 ビキニ <small>(png)</small></span>
+      <span class="char-upload-label">🥇 30,000pt迄 <small>(png)</small></span>
       <span class="char-upload-status" id="csBikini">—</span>
       <input type="file" id="ufBikini" accept="image/png,image/jpeg" style="display:none"/>
       <button class="char-upload-btn" data-target="bikini">📤 選択</button>
@@ -567,9 +567,9 @@ const POINTS_PER_ACT = 200;
 const REWARD_COST = 30000;
 
 const MILESTONES = [
-  { tier:1, name:'レオタード',     threshold:10000, fileName:'character_reward_leotard.png',   consume:false, emoji:'🥉' },
-  { tier:2, name:'サーフビキニ',   threshold:20000, fileName:'character_reward_surfbikini.png', consume:false, emoji:'🥈' },
-  { tier:3, name:'ビキニご褒美',   threshold:30000, fileName:'character_reward_bikini.png',     consume:true,  cost:30000, emoji:'🥇' }
+  { tier:1, name:'10,000pt迄',  threshold:10000, fileName:'character_reward_leotard.png',   consume:false, emoji:'🥉' },
+  { tier:2, name:'20,000pt迄',  threshold:20000, fileName:'character_reward_surfbikini.png', consume:false, emoji:'🥈' },
+  { tier:3, name:'30,000pt迄',  threshold:30000, fileName:'character_reward_bikini.png',     consume:true,  cost:30000, emoji:'🥇' }
 ];
 
 const DEFAULT_GOOD_ACTS = [
@@ -890,22 +890,64 @@ document.querySelectorAll('.seg button').forEach(b=>{
 
 /* -------- 食事画像（写真→AI解析） -------- */
 document.getElementById('mealPhoto').addEventListener('change', async (e)=>{
-  const file = e.target.files[0]; if(!file) return;
+  const orig = e.target.files[0]; if(!orig) return;
+  e.target.value=''; // 同じ画像の再選択を可能にする
   const ts = Date.now();
+  // iPhoneカメラの大容量画像を圧縮（最大1280px / JPEG 85%）
+  toast('🍴 画像を準備中…');
+  let file;
+  try{ file = await compressImageFile(orig); }catch(_){ file = orig; }
+
   const dataUrl = await fileToDataURL(file);
-  const meal = { ts, name:'(解析中...)', kcal:0, img: dataUrl, comment:'', source:'photo' };
+  const meal = { ts, name:'(解析中…)', kcal:0, img: dataUrl, comment:'画像をDriveにアップロード中', source:'photo', driveStatus:'uploading' };
   const meals = loadMeals(); meals.push(meal); saveMeals(meals);
   renderMeals(); updateStatus();
-  try{
-    const analyzed = await analyzeMealWithClaude(file);
-    meal.name = analyzed.name; meal.kcal = analyzed.kcal; meal.comment = analyzed.comment;
-    saveMeals(meals); renderMeals(); updateStatus();
-  }catch(err){
-    meal.name = '(未解析)'; meal.kcal = 0; meal.comment='APIキー未設定のため解析をスキップ';
-    saveMeals(meals); renderMeals();
+
+  // Drive アップロードと AI 解析を並行
+  const driveTask = (async ()=>{
+    if(!driveEnabled()){ meal.driveStatus='no_drive'; return; }
+    try{
+      const d = new Date(meal.ts);
+      const stamp = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
+      const imgName = `${stamp}_${Math.random().toString(36).slice(2,7)}.jpg`;
+      await uploadImageToDrive(file, imgName);
+      meal.imgName = imgName;
+      meal.driveStatus='uploaded';
+      saveMeals(meals); renderMeals();
+    }catch(err){
+      console.warn('drive image upload failed:', err);
+      meal.driveStatus='failed';
+      meal.driveError = err.message;
+      saveMeals(meals); renderMeals();
+      toast('Drive画像アップ失敗: '+err.message,'err');
+    }
+  })();
+
+  const aiTask = (async ()=>{
+    try{
+      const analyzed = await analyzeMealWithClaude(file);
+      meal.name = analyzed.name || '不明';
+      meal.kcal = analyzed.kcal || 0;
+      meal.balance = analyzed.balance || '';
+      meal.comment = analyzed.comment || '';
+      saveMeals(meals); renderMeals(); updateStatus();
+    }catch(err){
+      console.warn('AI analysis failed:', err);
+      meal.name = '(未解析)'; meal.comment='Claude APIキー未設定 or 解析失敗: '+err.message;
+      saveMeals(meals); renderMeals();
+    }
+  })();
+
+  await Promise.allSettled([driveTask, aiTask]);
+
+  // Excel記録（Drive接続時）
+  if(driveEnabled()){
+    try{
+      await tryUploadMealToDriveExcel(meal);
+      meal.excelSynced = true;
+      saveMeals(meals); renderMeals();
+    }catch(err){ console.warn('excel sync failed:', err); }
   }
-  tryUploadMealToDrive(file, meal);
-  e.target.value='';
 });
 
 /* -------- 食事クイック記録 -------- */
@@ -946,12 +988,18 @@ function renderMeals(){
   const meals = loadMeals().filter(m=>isoDay(m.ts)===today()).sort((a,b)=>a.ts-b.ts);
   list.innerHTML = meals.map(m=>{
     const visual = m.img ? `<img src="${m.img}" alt="meal"/>` : `<div class="meal-icon">${quickIcon(m.name)}</div>`;
+    let driveBadge = '';
+    if(m.source==='photo'){
+      if(m.driveStatus==='uploading') driveBadge = '<span style="font-size:10px;color:var(--amber);margin-left:6px">☁ 同期中</span>';
+      else if(m.driveStatus==='uploaded') driveBadge = '<span style="font-size:10px;color:var(--green-dark);margin-left:6px">✓ Drive保存</span>';
+      else if(m.driveStatus==='failed') driveBadge = `<span style="font-size:10px;color:var(--red);margin-left:6px" title="${escapeHtml(m.driveError||'')}">⚠ 同期失敗</span>`;
+    }
     return `
     <div class="meal-row">
       ${visual}
       <div class="meal-meta" style="flex:1">
-        <b>${escapeHtml(m.name||'(解析中)')}</b> <span style="color:#2E7D32;font-weight:600">${(m.kcal||0).toLocaleString()}kcal</span><br/>
-        ${fmtTime(m.ts)} ${m.comment?'· '+escapeHtml(m.comment):''}
+        <b>${escapeHtml(m.name||'(解析中)')}</b> <span style="color:#2E7D32;font-weight:600">${(m.kcal||0).toLocaleString()}kcal</span>${driveBadge}<br/>
+        ${fmtTime(m.ts)}${m.balance?' · 🥗 '+escapeHtml(m.balance):''}${m.comment?'<br/>💬 '+escapeHtml(m.comment):''}
       </div>
     </div>`;
   }).join('') || '<div class="hint">今日の記録はまだありません。</div>';
@@ -966,6 +1014,39 @@ function quickIcon(name){
 }
 function escapeHtml(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function fileToDataURL(file){return new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(file);});}
+
+/* iPhone カメラの大容量画像を圧縮（HEIC→JPEG変換も兼ねる） */
+async function compressImageFile(file, maxDim=1280, quality=0.85){
+  // 動画なら触らない
+  if(file.type && file.type.startsWith('video/')) return file;
+  return new Promise((resolve, reject)=>{
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{
+      try{
+        URL.revokeObjectURL(url);
+        let { width, height } = img;
+        if(width > maxDim || height > maxDim){
+          if(width > height){ height = Math.round(height * maxDim / width); width = maxDim; }
+          else{ width = Math.round(width * maxDim / height); height = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(blob=>{
+          if(!blob){ resolve(file); return; }
+          const baseName = (file.name||'meal').replace(/\.[^.]+$/,'');
+          const newFile = new File([blob], `${baseName}.jpg`, { type:'image/jpeg' });
+          console.log(`[compress] ${file.name||'?'} ${(file.size/1024).toFixed(1)}KB → ${(newFile.size/1024).toFixed(1)}KB`);
+          resolve(newFile);
+        }, 'image/jpeg', quality);
+      }catch(e){ console.warn('compress fail, use original', e); resolve(file); }
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); console.warn('image load failed, use original'); resolve(file); };
+    img.src = url;
+  });
+}
 
 /* -------- サーフィン記録 -------- */
 const dlgSurf = document.getElementById('dlgSurf');
@@ -1491,18 +1572,25 @@ async function trySaveGoodActToDrive(rec, kind){
 /* -------- Claude API（食事画像解析） -------- */
 async function analyzeMealWithClaude(file){
   const cfg = loadCfg();
-  if(!cfg.claudeKey) throw new Error('no_api_key');
+  if(!cfg.claudeKey) throw new Error('APIキー未設定');
   const b64 = (await fileToDataURL(file)).split(',')[1];
   const body = {
     model: "claude-opus-4-6",
-    max_tokens: 600,
+    max_tokens: 800,
     messages:[{
       role:"user",
       content:[
         {type:"image", source:{type:"base64", media_type:file.type||"image/jpeg", data:b64}},
         {type:"text", text:
-          "食事画像を解析し、次をJSONで出力してください（余計な文を付けない）。\n"+
-          '{"name":"料理の大まかなメニュー","kcal":推定カロリー(kcal整数),"comment":"栄養バランスや注意点(60字以内)"}'
+          "食事の写真を解析してJSONだけで返してください（前後に文章を付けない）。\n"+
+          'フォーマット:\n'+
+          '{\n'+
+          '  "name": "料理名・メニュー名（30字以内）",\n'+
+          '  "kcal": 推定総カロリー(kcal整数),\n'+
+          '  "balance": "炭水化物/タンパク質/脂質/野菜の比率コメント(40字以内)",\n'+
+          '  "comment": "健康的視点でのアドバイス(60字以内・優しい口調)"\n'+
+          '}\n\n'+
+          'カロリーは栄養学的に妥当な値で、栄養バランスは具体的に評価してください。'
         }
       ]
     }]
@@ -1517,7 +1605,10 @@ async function analyzeMealWithClaude(file){
     },
     body: JSON.stringify(body)
   });
-  if(!res.ok) throw new Error('api_err_'+res.status);
+  if(!res.ok){
+    const errText = await res.text().catch(()=>'');
+    throw new Error(`API ${res.status}: ${errText.slice(0,150)}`);
+  }
   const j = await res.json();
   const txt = j.content?.[0]?.text || '{}';
   const m = txt.match(/\{[\s\S]*\}/);
@@ -1845,6 +1936,7 @@ async function tryUploadWeightToDrive(rec){
   }catch(e){ console.warn(e); setDriveStatus('err','☁ '+e.message.slice(0,20)); toast('Drive同期失敗: '+e.message,'err'); }
 }
 
+/* 既存互換：画像 + Excel 同時アップ（クイック食事ボタンから使用） */
 async function tryUploadMealToDrive(file, meal){
   if(!driveEnabled()) return;
   try{
@@ -1855,20 +1947,29 @@ async function tryUploadMealToDrive(file, meal){
       const ext = (file.name.split('.').pop()||'jpg').toLowerCase();
       imgName = `${stamp}_${Math.random().toString(36).slice(2,7)}.${ext}`;
       await uploadImageToDrive(file, imgName);
+      meal.imgName = imgName;
     }
-    const d = new Date(meal.ts);
-    const row = [
-      isoDay(meal.ts),
-      `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`,
-      meal.name||'',
-      meal.kcal||0,
-      imgName,
-      meal.comment||'',
-      meal.source||'quick'
-    ];
-    await appendRowToExcel('meal', row);
+    await tryUploadMealToDriveExcel(meal);
     setDriveStatus('on','☁ 同期OK');
   }catch(e){ console.warn(e); setDriveStatus('err','☁ '+e.message.slice(0,20)); toast('Drive同期失敗: '+e.message,'err'); }
+}
+
+/* Excel 単独同期（食事画像はDriveに別タスクでアップ済の前提） */
+async function tryUploadMealToDriveExcel(meal){
+  if(!driveEnabled()) return;
+  const d = new Date(meal.ts);
+  const balanceComment = (meal.balance ? meal.balance + ' / ' : '') + (meal.comment||'');
+  const row = [
+    isoDay(meal.ts),
+    `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`,
+    meal.name||'',
+    meal.kcal||0,
+    meal.imgName||'',
+    balanceComment,
+    meal.source||'quick'
+  ];
+  await appendRowToExcel('meal', row);
+  setDriveStatus('on','☁ 同期OK');
 }
 
 async function trySaveSurfToDrive(rec){
