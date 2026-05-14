@@ -438,6 +438,27 @@
   </div>
 </dialog>
 
+<!-- 食事画像 失敗時フォールバック ダイアログ -->
+<dialog id="dlgMealFallback">
+  <h3 id="mfTitle">⚠ 画像処理に失敗</h3>
+  <div id="mfDetail" style="font-size:11px;color:var(--muted);margin:8px 0;line-height:1.5;white-space:pre-line;background:#FFEBEE;padding:8px;border-radius:8px;max-height:100px;overflow-y:auto"></div>
+  <div style="font-size:13px;color:var(--text);line-height:1.6;margin:10px 0">
+    記録が途切れないよう、<b>クイック記録ボタン</b>で代用しますか？<br/>
+    あとでメモを追記できます。
+  </div>
+  <div class="quick-grid" style="margin-top:8px">
+    <button class="quick-btn" data-mf="少量" data-kcal="300"><div class="ico">🥗</div><div class="ttl">少量</div><div class="kcal">300 kcal</div></button>
+    <button class="quick-btn" data-mf="普通" data-kcal="600"><div class="ico">🍱</div><div class="ttl">普通</div><div class="kcal">600 kcal</div></button>
+    <button class="quick-btn" data-mf="ドカ食い" data-kcal="1000"><div class="ico">🍔</div><div class="ttl">ドカ食い</div><div class="kcal">1,000</div></button>
+    <button class="quick-btn" data-mf="プロテイン12g" data-kcal="60"><div class="ico">💪</div><div class="ttl">プロテイン</div><div class="kcal">60 kcal</div></button>
+    <button class="quick-btn" data-mf="間食" data-kcal="150"><div class="ico">🍪</div><div class="ttl">間食</div><div class="kcal">150 kcal</div></button>
+  </div>
+  <div class="actions" style="margin-top:14px">
+    <button class="cancel" id="mfCancel">キャンセル</button>
+    <button class="ok" id="mfRetry" style="background:var(--amber)">🔄 画像を再試行</button>
+  </div>
+</dialog>
+
 <!-- 過去日時で体重記録するダイアログ -->
 <dialog id="dlgPastWeight">
   <h3>📅 過去の日時で体重を記録</h3>
@@ -590,7 +611,36 @@ function saveCfg(c){ localStorage.setItem(STORE.config, JSON.stringify(c)); }
 function loadWeights(){ return JSON.parse(localStorage.getItem(STORE.weights) || '[]'); }
 function saveWeights(a){ localStorage.setItem(STORE.weights, JSON.stringify(a)); }
 function loadMeals(){ return JSON.parse(localStorage.getItem(STORE.meals) || '[]'); }
-function saveMeals(a){ localStorage.setItem(STORE.meals, JSON.stringify(a)); }
+
+/* localStorage 容量管理付き保存
+   - QuotaExceededError 時、古い画像(直近7日より前)を削除して再試行
+   - それでも超える場合はさらに古い画像から順次データURL→なし(imgName残す)へ
+*/
+function saveMeals(a){
+  const tryStore = (arr)=> localStorage.setItem(STORE.meals, JSON.stringify(arr));
+  try{ tryStore(a); return; }catch(e){
+    if(!/quota|QuotaExceededError/i.test(e.name+' '+e.message)) throw e;
+  }
+  // 直近7日より古い画像のdata URLを削除
+  console.warn('[storage] quota exceeded, trimming images');
+  const cutoff = Date.now() - 7*86400000;
+  for(const m of a){
+    if(m.ts < cutoff && m.img && m.img.startsWith('data:')){
+      m.img = ''; // Drive側のimgNameは残るので、後で参照可能
+    }
+  }
+  try{ tryStore(a); toast('🗑 古い画像を端末から整理しました(Drive側は保持)','ok'); return; }catch(e){}
+  // それでも溢れる場合、すべての画像を削除して名前のみ残す
+  console.warn('[storage] still over quota, dropping all image data');
+  for(const m of a){
+    if(m.img && m.img.startsWith('data:')) m.img = '';
+  }
+  try{ tryStore(a); toast('⚠ 容量不足のため全画像のローカル表示を一時停止','err'); return; }catch(e){}
+  // 最終手段: 古いレコード10件削除
+  while(a.length>10){ a.shift(); }
+  tryStore(a);
+  toast('⚠ 容量不足のため古い食事記録を削除','err');
+}
 function loadSurfs(){ return JSON.parse(localStorage.getItem(STORE.surfs) || '[]'); }
 function saveSurfs(a){ localStorage.setItem(STORE.surfs, JSON.stringify(a)); }
 function loadGoodActs(){ return JSON.parse(localStorage.getItem(STORE.goodActs)||'[]'); }
@@ -888,66 +938,151 @@ document.querySelectorAll('.seg button').forEach(b=>{
   });
 });
 
-/* -------- 食事画像（写真→AI解析） -------- */
+/* -------- 食事画像（写真→AI解析） --------
+   失敗時はフォールバックダイアログでクイック記録に切替可能
+*/
 document.getElementById('mealPhoto').addEventListener('change', async (e)=>{
   const orig = e.target.files[0]; if(!orig) return;
   e.target.value=''; // 同じ画像の再選択を可能にする
-  const ts = Date.now();
-  // iPhoneカメラの大容量画像を圧縮（最大1280px / JPEG 85%）
-  toast('🍴 画像を準備中…');
-  let file;
-  try{ file = await compressImageFile(orig); }catch(_){ file = orig; }
+  await processMealPhoto(orig);
+});
 
-  const dataUrl = await fileToDataURL(file);
-  const meal = { ts, name:'(解析中…)', kcal:0, img: dataUrl, comment:'画像をDriveにアップロード中', source:'photo', driveStatus:'uploading' };
-  const meals = loadMeals(); meals.push(meal); saveMeals(meals);
+async function processMealPhoto(orig){
+  const ts = Date.now();
+  toast('🍴 画像を準備中…');
+
+  // 1. 圧縮（サムネ用・小+ アップロード用・大）
+  let uploadFile, thumbDataUrl;
+  try{
+    uploadFile = await compressImageFile(orig, 1280, 0.85);
+    const thumbFile = await compressImageFile(orig, 320, 0.7);
+    thumbDataUrl = await fileToDataURL(thumbFile);
+  }catch(err){
+    console.warn('image compression failed', err);
+    return showMealFallback('画像準備失敗', err.message||'画像を読み込めません', null);
+  }
+
+  // 2. 仮レコード保存
+  const meal = { ts, name:'(解析中…)', kcal:0, img: thumbDataUrl, comment:'', source:'photo', driveStatus:'uploading' };
+  const meals = loadMeals(); meals.push(meal);
+  try{ saveMeals(meals); }catch(err){
+    console.warn('save meal failed:', err);
+    meal.img = ''; // 容量問題ならサムネ捨てる
+    try{ saveMeals(meals); }catch(err2){
+      return showMealFallback('容量不足', '端末の保存容量がいっぱいです', uploadFile);
+    }
+  }
   renderMeals(); updateStatus();
 
-  // Drive アップロードと AI 解析を並行
+  // 3. Drive アップロードと AI 解析を並行実行
+  let driveOk = false, aiOk = false, driveErr=null, aiErr=null;
+
   const driveTask = (async ()=>{
     if(!driveEnabled()){ meal.driveStatus='no_drive'; return; }
     try{
       const d = new Date(meal.ts);
       const stamp = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
       const imgName = `${stamp}_${Math.random().toString(36).slice(2,7)}.jpg`;
-      await uploadImageToDrive(file, imgName);
+      await uploadImageToDrive(uploadFile, imgName);
       meal.imgName = imgName;
       meal.driveStatus='uploaded';
+      driveOk = true;
       saveMeals(meals); renderMeals();
     }catch(err){
       console.warn('drive image upload failed:', err);
+      driveErr = err;
       meal.driveStatus='failed';
       meal.driveError = err.message;
-      saveMeals(meals); renderMeals();
-      toast('Drive画像アップ失敗: '+err.message,'err');
+      try{ saveMeals(meals); }catch(_){}
+      renderMeals();
     }
   })();
 
   const aiTask = (async ()=>{
     try{
-      const analyzed = await analyzeMealWithClaude(file);
+      const analyzed = await analyzeMealWithClaude(uploadFile);
       meal.name = analyzed.name || '不明';
       meal.kcal = analyzed.kcal || 0;
       meal.balance = analyzed.balance || '';
       meal.comment = analyzed.comment || '';
-      saveMeals(meals); renderMeals(); updateStatus();
+      aiOk = true;
+      try{ saveMeals(meals); }catch(_){}
+      renderMeals(); updateStatus();
     }catch(err){
       console.warn('AI analysis failed:', err);
-      meal.name = '(未解析)'; meal.comment='Claude APIキー未設定 or 解析失敗: '+err.message;
-      saveMeals(meals); renderMeals();
+      aiErr = err;
+      meal.name = '(未解析)'; meal.comment='解析失敗: '+err.message;
+      try{ saveMeals(meals); }catch(_){}
+      renderMeals();
     }
   })();
 
   await Promise.allSettled([driveTask, aiTask]);
 
-  // Excel記録（Drive接続時）
-  if(driveEnabled()){
+  // 4. Excel記録（Drive接続時）
+  if(driveEnabled() && driveOk){
     try{
       await tryUploadMealToDriveExcel(meal);
       meal.excelSynced = true;
       saveMeals(meals); renderMeals();
     }catch(err){ console.warn('excel sync failed:', err); }
   }
+
+  // 5. 両方失敗 → フォールバック
+  if(!driveOk && !aiOk){
+    // この食事を一旦削除して、フォールバック提示
+    const idx = meals.indexOf(meal);
+    if(idx>=0) meals.splice(idx,1);
+    try{ saveMeals(meals); }catch(_){}
+    renderMeals();
+    const msg = (driveErr?'Drive: '+driveErr.message+'\n':'')+(aiErr?'AI: '+aiErr.message:'');
+    showMealFallback('画像処理に失敗', msg, uploadFile);
+  }else if(!driveOk){
+    toast('⚠ Drive同期失敗。ローカルには保存済み','err');
+  }else if(!aiOk){
+    toast('⚠ AI解析失敗。画像はDriveに保存済み','err');
+  }
+}
+
+/* フォールバックダイアログ：失敗時にクイック記録への切替を促す */
+function showMealFallback(title, detail, originalFile){
+  const dlg = document.getElementById('dlgMealFallback');
+  document.getElementById('mfTitle').textContent = '⚠ '+title;
+  document.getElementById('mfDetail').textContent = detail || '';
+  // 失敗した画像を再試行用に保持
+  window._pendingMealFile = originalFile;
+  dlg.showModal();
+}
+
+// フォールバックダイアログのクイックボタン
+document.querySelectorAll('#dlgMealFallback .quick-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const name = btn.dataset.mf;
+    const kcal = Number(btn.dataset.kcal);
+    const ts = Date.now();
+    const meals = loadMeals();
+    meals.push({ ts, name, kcal, img:'', comment:'(画像処理失敗のためクイック記録)', source:'quick' });
+    try{ saveMeals(meals); }catch(_){}
+    document.getElementById('dlgMealFallback').close();
+    window._pendingMealFile = null;
+    renderMeals(); updateStatus();
+    toast(`🍴 ${name} を記録しました`,'ok');
+    if(driveEnabled()){
+      tryUploadMealToDrive(null, meals[meals.length-1]);
+    }
+  });
+});
+document.getElementById('mfCancel').addEventListener('click', e=>{
+  e.preventDefault();
+  document.getElementById('dlgMealFallback').close();
+  window._pendingMealFile = null;
+});
+document.getElementById('mfRetry').addEventListener('click', async e=>{
+  e.preventDefault();
+  const file = window._pendingMealFile;
+  document.getElementById('dlgMealFallback').close();
+  window._pendingMealFile = null;
+  if(file) processMealPhoto(file);
 });
 
 /* -------- 食事クイック記録 -------- */
@@ -1015,7 +1150,10 @@ function quickIcon(name){
 function escapeHtml(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function fileToDataURL(file){return new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(file);});}
 
-/* iPhone カメラの大容量画像を圧縮（HEIC→JPEG変換も兼ねる） */
+/* iPhone カメラの大容量画像を圧縮（HEIC→JPEG変換も兼ねる）
+   maxDim=1280: Drive保存用（高画質）
+   maxDim=320: アプリ内サムネ用（軽量）
+*/
 async function compressImageFile(file, maxDim=1280, quality=0.85){
   // 動画なら触らない
   if(file.type && file.type.startsWith('video/')) return file;
@@ -1038,7 +1176,7 @@ async function compressImageFile(file, maxDim=1280, quality=0.85){
           if(!blob){ resolve(file); return; }
           const baseName = (file.name||'meal').replace(/\.[^.]+$/,'');
           const newFile = new File([blob], `${baseName}.jpg`, { type:'image/jpeg' });
-          console.log(`[compress] ${file.name||'?'} ${(file.size/1024).toFixed(1)}KB → ${(newFile.size/1024).toFixed(1)}KB`);
+          console.log(`[compress ${maxDim}px] ${file.name||'?'} ${(file.size/1024).toFixed(1)}KB → ${(newFile.size/1024).toFixed(1)}KB`);
           resolve(newFile);
         }, 'image/jpeg', quality);
       }catch(e){ console.warn('compress fail, use original', e); resolve(file); }
@@ -1782,13 +1920,25 @@ async function getDriveToken({silent=false}={}){
   });
 }
 
-async function driveFetch(url, opts={}){
+async function driveFetch(url, opts={}, _retry=false){
   const token = await getDriveToken({silent:true});
   const headers = Object.assign({}, opts.headers||{}, { Authorization: 'Bearer '+token });
   const fullUrl = url.startsWith('http') ? url : DRIVE_API+url;
   const res = await fetch(fullUrl, Object.assign({}, opts, { headers }));
   if(res.status===401){
     driveAccessToken=null;
+    driveTokenExpiresAt=0;
+    // 1回だけ自動再取得を試みる
+    if(!_retry){
+      console.warn('[drive] 401 → silent token re-acquire');
+      try{
+        await getDriveToken({silent:true});
+        return await driveFetch(url, opts, true);
+      }catch(e){
+        setDriveStatus('err','☁ 再認可必要');
+        throw new Error('Drive 認可期限切れ。右上の ☁ をタップして再ログインしてください');
+      }
+    }
     throw new Error('認可期限切れ');
   }
   if(!res.ok){
