@@ -58,6 +58,10 @@
   .meal-icon{width:56px;height:56px;border-radius:10px;background:#FFF8E1;display:flex;align-items:center;justify-content:center;font-size:28px}
   .meal-meta{font-size:12px;color:var(--muted)}
   .meal-meta b{color:var(--text);font-size:13px}
+  .nutri-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+  .nutri-item{display:inline-flex;align-items:center;gap:2px;padding:2px 6px;background:#F1F8E9;border-radius:6px;font-size:10px;font-weight:600;color:var(--green-dark)}
+  .nutri-item small{font-size:9px;color:var(--muted);font-weight:500;margin-left:1px}
+  .nutri-emoji{font-size:11px}
   .hint{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5}
   .upload{display:flex;flex-direction:column;gap:6px;}
   .upload label{display:block;background:#FFF8E1;color:#6D4C41;padding:12px;border-radius:12px;text-align:center;font-weight:600;cursor:pointer;border:1.5px dashed #FFCA28;font-size:14px;}
@@ -1003,6 +1007,13 @@ async function processMealPhoto(orig){
       const analyzed = await analyzeMealWithClaude(uploadFile);
       meal.name = analyzed.name || '不明';
       meal.kcal = analyzed.kcal || 0;
+      meal.protein_g = analyzed.protein_g || 0;
+      meal.carbs_g   = analyzed.carbs_g   || 0;
+      meal.fat_g     = analyzed.fat_g     || 0;
+      meal.fiber_g   = analyzed.fiber_g   || 0;
+      meal.protein_pct = analyzed.protein_pct || 0;
+      meal.carbs_pct   = analyzed.carbs_pct   || 0;
+      meal.fat_pct     = analyzed.fat_pct     || 0;
       meal.balance = analyzed.balance || '';
       meal.comment = analyzed.comment || '';
       aiOk = true;
@@ -1129,12 +1140,26 @@ function renderMeals(){
       else if(m.driveStatus==='uploaded') driveBadge = '<span style="font-size:10px;color:var(--green-dark);margin-left:6px">✓ Drive保存</span>';
       else if(m.driveStatus==='failed') driveBadge = `<span style="font-size:10px;color:var(--red);margin-left:6px" title="${escapeHtml(m.driveError||'')}">⚠ 同期失敗</span>`;
     }
+    // 栄養素表示
+    let nutri = '';
+    if(m.protein_g || m.carbs_g || m.fat_g || m.fiber_g){
+      const p = m.protein_g||0, c = m.carbs_g||0, f = m.fat_g||0, fi = m.fiber_g||0;
+      const pp = m.protein_pct||0, cp = m.carbs_pct||0, fp = m.fat_pct||0;
+      nutri = `<div class="nutri-row">
+        <span class="nutri-item"><span class="nutri-emoji">🥩</span>P ${p}g<small>(${pp}%)</small></span>
+        <span class="nutri-item"><span class="nutri-emoji">🍞</span>C ${c}g<small>(${cp}%)</small></span>
+        <span class="nutri-item"><span class="nutri-emoji">🧈</span>F ${f}g<small>(${fp}%)</small></span>
+        <span class="nutri-item"><span class="nutri-emoji">🌾</span>Fi ${fi}g</span>
+      </div>`;
+    }
     return `
     <div class="meal-row">
       ${visual}
       <div class="meal-meta" style="flex:1">
         <b>${escapeHtml(m.name||'(解析中)')}</b> <span style="color:#2E7D32;font-weight:600">${(m.kcal||0).toLocaleString()}kcal</span>${driveBadge}<br/>
-        ${fmtTime(m.ts)}${m.balance?' · 🥗 '+escapeHtml(m.balance):''}${m.comment?'<br/>💬 '+escapeHtml(m.comment):''}
+        ${fmtTime(m.ts)}${m.balance?' · 🥗 '+escapeHtml(m.balance):''}
+        ${nutri}
+        ${m.comment?'<div style="margin-top:2px">💬 '+escapeHtml(m.comment)+'</div>':''}
       </div>
     </div>`;
   }).join('') || '<div class="hint">今日の記録はまだありません。</div>';
@@ -1714,7 +1739,7 @@ async function analyzeMealWithClaude(file){
   const b64 = (await fileToDataURL(file)).split(',')[1];
   const body = {
     model: "claude-opus-4-6",
-    max_tokens: 800,
+    max_tokens: 1000,
     messages:[{
       role:"user",
       content:[
@@ -1725,10 +1750,17 @@ async function analyzeMealWithClaude(file){
           '{\n'+
           '  "name": "料理名・メニュー名（30字以内）",\n'+
           '  "kcal": 推定総カロリー(kcal整数),\n'+
-          '  "balance": "炭水化物/タンパク質/脂質/野菜の比率コメント(40字以内)",\n'+
+          '  "protein_g": タンパク質グラム数(整数),\n'+
+          '  "carbs_g": 炭水化物グラム数(整数),\n'+
+          '  "fat_g": 脂質グラム数(整数),\n'+
+          '  "fiber_g": 食物繊維グラム数(整数),\n'+
+          '  "protein_pct": タンパク質のカロリー比率(%整数),\n'+
+          '  "carbs_pct": 炭水化物のカロリー比率(%整数),\n'+
+          '  "fat_pct": 脂質のカロリー比率(%整数),\n'+
+          '  "balance": "栄養バランス総評(40字以内)",\n'+
           '  "comment": "健康的視点でのアドバイス(60字以内・優しい口調)"\n'+
           '}\n\n'+
-          'カロリーは栄養学的に妥当な値で、栄養バランスは具体的に評価してください。'
+          '計算ルール: タンパク質4kcal/g, 炭水化物4kcal/g, 脂質9kcal/g。三大栄養素の%合計は約100%。食物繊維は炭水化物に含むがカロリー比率には別途含めない。'
         }
       ]
     }]
@@ -2108,7 +2140,11 @@ async function tryUploadMealToDrive(file, meal){
 async function tryUploadMealToDriveExcel(meal){
   if(!driveEnabled()) return;
   const d = new Date(meal.ts);
-  const balanceComment = (meal.balance ? meal.balance + ' / ' : '') + (meal.comment||'');
+  // 栄養情報を含むコメント
+  const nutriPart = (meal.protein_g||meal.carbs_g||meal.fat_g||meal.fiber_g)
+    ? ` [P:${meal.protein_g||0}g(${meal.protein_pct||0}%) C:${meal.carbs_g||0}g(${meal.carbs_pct||0}%) F:${meal.fat_g||0}g(${meal.fat_pct||0}%) Fi:${meal.fiber_g||0}g]`
+    : '';
+  const balanceComment = (meal.balance ? meal.balance + ' / ' : '') + (meal.comment||'') + nutriPart;
   const row = [
     isoDay(meal.ts),
     `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`,
